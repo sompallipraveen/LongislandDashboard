@@ -143,9 +143,18 @@ def login():
         try:
             user = db.users.find_one({'email': email})
             
-            if user and check_password_hash(user['password'], password):
-                # Check if user is admin
-                if user.get('role') == 'admin':
+            if user and user.get('role') == 'admin':
+                # Try to check password with error handling for unsupported hash types
+                try:
+                    password_matches = check_password_hash(user['password'], password)
+                except ValueError as e:
+                    if "unsupported hash type" in str(e):
+                        flash('Login error: Password verification not supported in this environment', 'danger')
+                        return render_template('admin/login.html')
+                    else:
+                        raise e
+                
+                if password_matches:
                     session['user_id'] = str(user['_id'])
                     session['full_name'] = user['full_name']
                     session['email'] = user['email']
@@ -155,7 +164,7 @@ def login():
                     flash('Login successful!', 'success')
                     return redirect(url_for('dashboard'))
                 else:
-                    flash('You do not have admin privileges', 'danger')
+                    flash('Invalid email or password', 'danger')
             else:
                 flash('Invalid email or password', 'danger')
         except Exception as e:
