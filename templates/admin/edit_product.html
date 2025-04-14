@@ -1,0 +1,491 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Edit Product - Long Island Fragrances{% endblock %}
+
+{% block extra_css %}
+<style>
+    .image-preview-container {
+        width: 150px;
+        height: 150px;
+        border: 1px dashed #ccc;
+        border-radius: 5px;
+        margin-top: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+    
+    .image-preview {
+        max-width: 100%;
+        max-height: 100%;
+    }
+    
+    .required-field::after {
+        content: "*";
+        color: #e74a3b;
+        margin-left: 4px;
+    }
+    
+    .card {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-section-title {
+        border-bottom: 1px solid #e3e6f0;
+        padding-bottom: 0.75rem;
+        margin-bottom: 1.5rem;
+        font-weight: 600;
+        color: #4e73df;
+    }
+    
+    .size-variant-row {
+        background-color: #f8f9fc;
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+    }
+    
+    .size-variant-row:hover {
+        background-color: #eaecf4;
+    }
+    
+    .btn-add-size {
+        margin-bottom: 15px;
+    }
+    
+    .btn-remove-size {
+        margin-top: 32px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Edit Product</h1>
+    <div>
+        <a href="{{ url_for('products') }}" class="d-sm-inline-block btn btn-sm btn-secondary shadow-sm me-2">
+            <i class="fas fa-arrow-left fa-sm text-white-50 me-1"></i> Back to Products
+        </a>
+        <a href="{{ url_for('products') }}" class="d-sm-inline-block btn btn-sm btn-primary shadow-sm">
+            <i class="fas fa-eye fa-sm text-white-50 me-1"></i> View Product
+        </a>
+    </div>
+</div>
+
+<!-- Product Form Card -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Product Information</h6>
+    </div>
+    <div class="card-body">
+        <form action="{{ url_for('edit_product', product_id=product._id) }}" method="post" enctype="multipart/form-data">
+            <div class="row">
+                <!-- Basic Information -->
+                <div class="col-lg-8">
+                    <h5 class="form-section-title">Basic Details</h5>
+                    <div class="mb-3">
+                        <label for="name" class="form-label required-field">Product Name</label>
+                        <input type="text" class="form-control" id="name" name="name" value="{{ product.name }}" required>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="category_id" class="form-label required-field">Category</label>
+                                <select class="form-select" id="category_id" name="category_id" required>
+                                    <option value="">Select Category</option>
+                                    {% for category in categories %}
+                                    <option value="{{ category._id }}" {% if category._id|string == product.category_id|string %}selected{% endif %}>{{ category.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="brand_id" class="form-label required-field">Brand</label>
+                                <select class="form-select" id="brand_id" name="brand_id" required>
+                                    <option value="">Select Brand</option>
+                                    {% for brand in brands %}
+                                    <option value="{{ brand._id }}" {% if brand._id|string == product.brand_id|string %}selected{% endif %}>{{ brand.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="5">{{ product.description }}</textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="fragrance_notes" class="form-label">Fragrance Notes</label>
+                        <textarea class="form-control" id="fragrance_notes" name="fragrance_notes" rows="3" placeholder="Describe top, middle, and base notes">{{ product.fragrance_notes }}</textarea>
+                        <small class="text-muted">Example: Top: Bergamot, Lemon; Middle: Jasmine, Rose; Base: Sandalwood, Musk</small>
+                    </div>
+                </div>
+                
+                <!-- Product Image -->
+                <div class="col-lg-4">
+                    <h5 class="form-section-title">Image</h5>
+                    <div class="mb-3">
+                        <label for="image" class="form-label">Product Image</label>
+                        <input type="file" class="form-control" id="image" name="image" accept=".jpg,.jpeg,.png,.gif">
+                        
+                        {% if product.image_id %}
+                        <div id="currentImageContainer" class="image-preview-container">
+                            <img src="{{ url_for('serve_image', image_id=product.image_id) }}" alt="{{ product.name }}" class="image-preview">
+                        </div>
+                        <small class="text-muted">Current image shown. Upload a new one to replace it.</small>
+                        {% else %}
+                        <div id="imagePreviewContainer" class="image-preview-container">
+                            <div class="text-center text-muted">No image</div>
+                        </div>
+                        <div id="newImagePreviewContainer" class="image-preview-container d-none">
+                            <img id="imagePreview" class="image-preview" src="#" alt="Image Preview">
+                        </div>
+                        <small class="text-muted">No image currently. Images will be stored in MongoDB database.</small>
+                        {% endif %}
+                    </div>
+                    
+                    <h5 class="form-section-title mt-4">Product Classification</h5>
+                    <div class="mb-3">
+                        <label class="form-label">Product Type</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="product_type" id="type-edp" value="Eau De Parfum" {% if product.product_type == 'Eau De Parfum' %}checked{% endif %}>
+                            <label class="form-check-label" for="type-edp">Eau De Parfum</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="product_type" id="type-edt" value="Eau De Toilette" {% if product.product_type == 'Eau De Toilette' %}checked{% endif %}>
+                            <label class="form-check-label" for="type-edt">Eau De Toilette</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="product_type" id="type-cologne" value="Cologne" {% if product.product_type == 'Cologne' %}checked{% endif %}>
+                            <label class="form-check-label" for="type-cologne">Cologne</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="product_type" id="type-other" value="Other" {% if product.product_type == 'Other' or not product.product_type %}checked{% endif %}>
+                            <label class="form-check-label" for="type-other">Other</label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Gender</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="gender" id="gender-men" value="Men" {% if product.gender == 'Men' %}checked{% endif %}>
+                            <label class="form-check-label" for="gender-men">Men</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="gender" id="gender-women" value="Women" {% if product.gender == 'Women' %}checked{% endif %}>
+                            <label class="form-check-label" for="gender-women">Women</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="gender" id="gender-unisex" value="Unisex" {% if product.gender == 'Unisex' or not product.gender %}checked{% endif %}>
+                            <label class="form-check-label" for="gender-unisex">Unisex</label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="weight" class="form-label">Weight (oz)</label>
+                        <input type="number" class="form-control" id="weight" name="weight" min="0" step="0.01" value="{{ product.weight or '' }}">
+                    </div>
+                    
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="featured" name="featured" {% if product.featured %}checked{% endif %}>
+                        <label class="form-check-label" for="featured">
+                            Featured Product
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <hr>
+            
+            <!-- Size Variants -->
+            <div class="row">
+                <div class="col-12">
+                    <h5 class="form-section-title">Size Variants</h5>
+                    <p class="text-muted mb-3">Manage different sizes with their specific prices and stock levels.</p>
+                    
+                    <!-- Size Variants Container -->
+                    <div id="sizeVariantsContainer">
+                        {% for size in product.sizes %}
+                        <div class="size-variant-row">
+                            <div class="row">
+                                <input type="hidden" name="size_id[]" value="{{ size.id }}">
+                                <div class="col-md-3 mb-2">
+                                    <label class="form-label required-field">Size Display</label>
+                                    <select class="form-select size-display-select" name="size_display[]" required>
+                                        <option value="1.0oz/30ml" {% if size.size_display == '1.0oz/30ml' %}selected{% endif %}>1.0oz/30ml</option>
+                                        <option value="1.7oz/50ml" {% if size.size_display == '1.7oz/50ml' %}selected{% endif %}>1.7oz/50ml</option>
+                                        <option value="2.5oz/75ml" {% if size.size_display == '2.5oz/75ml' %}selected{% endif %}>2.5oz/75ml</option>
+                                        <option value="3.3oz/100ml" {% if size.size_display == '3.3oz/100ml' %}selected{% endif %}>3.3oz/100ml</option>
+                                        <option value="6.7oz/200ml" {% if size.size_display == '6.7oz/200ml' %}selected{% endif %}>6.7oz/200ml</option>
+                                    </select>
+                                    <input type="hidden" class="size-value" name="size[]" value="{{ size.size }}">
+                                </div>
+                                <div class="col-md-2 mb-2">
+                                    <label class="form-label required-field">Price ($)</label>
+                                    <input type="number" class="form-control" name="size_price[]" min="0" step="0.01" value="{{ size.price }}" required>
+                                </div>
+                                <div class="col-md-2 mb-2">
+                                    <label class="form-label required-field">Stock</label>
+                                    <input type="number" class="form-control" name="size_stock[]" min="0" step="1" value="{{ size.stock }}" required>
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <label class="form-label">SKU</label>
+                                    <input type="text" class="form-control size-sku" name="size_sku[]" value="{{ size.sku }}">
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-outline-danger btn-remove-size">
+                                        <i class="fas fa-times"></i> Remove
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <!-- Size Template (Hidden) -->
+                    <div class="size-variant-row d-none" id="sizeTemplate">
+                        <div class="row">
+                            <input type="hidden" name="size_id[]" value="">
+                            <div class="col-md-3 mb-2">
+                                <label class="form-label required-field">Size Display</label>
+                                <select class="form-select size-display-select" name="size_display[]" required>
+                                    <option value="1.0oz/30ml">1.0oz/30ml</option>
+                                    <option value="1.7oz/50ml">1.7oz/50ml</option>
+                                    <option value="2.5oz/75ml">2.5oz/75ml</option>
+                                    <option value="3.3oz/100ml" selected>3.3oz/100ml</option>
+                                    <option value="6.7oz/200ml">6.7oz/200ml</option>
+                                </select>
+                                <input type="hidden" class="size-value" name="size[]" value="100">
+                            </div>
+                            <div class="col-md-2 mb-2">
+                                <label class="form-label required-field">Price ($)</label>
+                                <input type="number" class="form-control" name="size_price[]" min="0" step="0.01" value="0" required>
+                            </div>
+                            <div class="col-md-2 mb-2">
+                                <label class="form-label required-field">Stock</label>
+                                <input type="number" class="form-control" name="size_stock[]" min="0" step="1" value="0" required>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <label class="form-label">SKU</label>
+                                <input type="text" class="form-control size-sku" name="size_sku[]">
+                            </div>
+                            <div class="col-md-2">
+                                <button type="button" class="btn btn-outline-danger btn-remove-size">
+                                    <i class="fas fa-times"></i> Remove
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="button" class="btn btn-outline-primary btn-add-size">
+                        <i class="fas fa-plus"></i> Add Another Size
+                    </button>
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-end mt-4">
+                <a href="{{ url_for('products') }}" class="btn btn-secondary me-2">
+                    <i class="fas fa-times me-1"></i> Cancel
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-1"></i> Update Product
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Image preview functionality
+        const imageInput = document.getElementById('image');
+        const imagePreview = document.getElementById('imagePreview');
+        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+        const newImagePreviewContainer = document.getElementById('newImagePreviewContainer');
+        const currentImageContainer = document.getElementById('currentImageContainer');
+        
+        if (imageInput) {
+            imageInput.addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(e) {
+                        // Hide current image if it exists
+                        if (currentImageContainer) {
+                            currentImageContainer.classList.add('d-none');
+                        }
+                        
+                        if (imagePreviewContainer) {
+                            imagePreviewContainer.classList.add('d-none');
+                        }
+                        
+                        // Show new image preview
+                        if (imagePreview) {
+                            imagePreview.src = e.target.result;
+                            newImagePreviewContainer.classList.remove('d-none');
+                        }
+                    }
+                    
+                    reader.readAsDataURL(this.files[0]);
+                } else {
+                    // Show current image if it exists
+                    if (currentImageContainer) {
+                        currentImageContainer.classList.remove('d-none');
+                    } else if (imagePreviewContainer) {
+                        imagePreviewContainer.classList.remove('d-none');
+                    }
+                    
+                    // Hide new image preview
+                    if (newImagePreviewContainer) {
+                        newImagePreviewContainer.classList.add('d-none');
+                    }
+                }
+            });
+        }
+        
+        // Size variants management
+        const sizeTemplate = document.getElementById('sizeTemplate');
+        const sizeVariantsContainer = document.getElementById('sizeVariantsContainer');
+        const addSizeBtn = document.querySelector('.btn-add-size');
+        
+        // Map of size display values to numeric size values
+        const sizeMap = {
+            '1.0oz/30ml': 30,
+            '1.7oz/50ml': 50,
+            '2.5oz/75ml': 75,
+            '3.3oz/100ml': 100,
+            '6.7oz/200ml': 200
+        };
+        
+        // Initialize existing size variants
+        document.querySelectorAll('.size-variant-row:not(#sizeTemplate)').forEach(initSizeVariant);
+        
+        // Add new size variant
+        if (addSizeBtn) {
+            addSizeBtn.addEventListener('click', function() {
+                if (sizeTemplate && sizeVariantsContainer) {
+                    const newSize = sizeTemplate.cloneNode(true);
+                    newSize.classList.remove('d-none');
+                    newSize.id = 'size-' + Date.now();
+                    sizeVariantsContainer.appendChild(newSize);
+                    initSizeVariant(newSize);
+                    
+                    // Generate unique ID for the new size
+                    const sizeIdInput = newSize.querySelector('input[name="size_id[]"]');
+                    if (sizeIdInput) {
+                        sizeIdInput.value = generateUUID();
+                    }
+                }
+            });
+        }
+        
+        // Remove size variant (using event delegation)
+        if (sizeVariantsContainer) {
+            sizeVariantsContainer.addEventListener('click', function(e) {
+                if (e.target.classList.contains('btn-remove-size') || e.target.closest('.btn-remove-size')) {
+                    const row = e.target.closest('.size-variant-row');
+                    
+                    // Only remove if there's more than one size variant
+                    const visibleRows = document.querySelectorAll('.size-variant-row:not(.d-none)');
+                    if (visibleRows.length > 1) {
+                        row.remove();
+                    } else {
+                        alert('At least one size variant is required.');
+                    }
+                }
+            });
+        }
+        
+        // Initialize a size variant with event listeners
+        function initSizeVariant(sizeElement) {
+            // Size display select change handler
+            const sizeSelect = sizeElement.querySelector('.size-display-select');
+            const sizeValue = sizeElement.querySelector('.size-value');
+            const skuInput = sizeElement.querySelector('.size-sku');
+            
+            if (sizeSelect) {
+                sizeSelect.addEventListener('change', function() {
+                    // Update the hidden size value
+                    if (sizeValue) {
+                        sizeValue.value = sizeMap[this.value] || 100;
+                    }
+                    
+                    // Update SKU if empty
+                    if (skuInput && (!skuInput.value.trim() || /^.+\-\d+ml$/.test(skuInput.value))) {
+                        const productName = document.getElementById('name').value || 'product';
+                        const formattedName = productName.toLowerCase().replace(/\s+/g, '-');
+                        skuInput.value = `${formattedName}-${sizeMap[this.value] || 100}ml`;
+                    }
+                });
+                
+                // Ensure size values are correctly set
+                if (sizeValue && sizeSelect.value) {
+                    sizeValue.value = sizeMap[sizeSelect.value] || 100;
+                }
+            }
+        }
+        
+        // Generate SKU when product name changes
+        const nameInput = document.getElementById('name');
+        if (nameInput) {
+            nameInput.addEventListener('input', function() {
+                const sizeRows = document.querySelectorAll('.size-variant-row:not(.d-none)');
+                sizeRows.forEach(row => {
+                    const skuInput = row.querySelector('.size-sku');
+                    const sizeSelect = row.querySelector('.size-display-select');
+                    if (skuInput && sizeSelect) {
+                        const sizeValue = sizeMap[sizeSelect.value] || 100;
+                        
+                        // Only update if SKU is empty or appears to be auto-generated
+                        if (!skuInput.value.trim() || /^.+\-\d+ml$/.test(skuInput.value)) {
+                            const formattedName = this.value.toLowerCase().replace(/\s+/g, '-');
+                            skuInput.value = `${formattedName}-${sizeValue}ml`;
+                        }
+                    }
+                });
+            });
+        }
+        
+        // Form submission validation
+        const form = document.querySelector('form');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                // Verify at least one size variant has price and stock
+                const sizeRows = document.querySelectorAll('.size-variant-row:not(.d-none)');
+                let valid = false;
+                
+                sizeRows.forEach(row => {
+                    const priceInput = row.querySelector('input[name="size_price[]"]');
+                    const stockInput = row.querySelector('input[name="size_stock[]"]');
+                    
+                    if (priceInput && stockInput && 
+                        priceInput.value && parseFloat(priceInput.value) >= 0 && 
+                        stockInput.value && parseInt(stockInput.value) >= 0) {
+                        valid = true;
+                    }
+                });
+                
+                if (!valid && sizeRows.length > 0) {
+                    e.preventDefault();
+                    alert('Please ensure at least one size variant has valid price and stock values.');
+                }
+            });
+        }
+        
+        // Helper function to generate UUID
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+    });
+</script>
+{% endblock %}

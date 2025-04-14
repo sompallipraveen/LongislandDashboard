@@ -1,0 +1,228 @@
+/**
+ * Admin Dashboard CSS
+ * Long Island Perfumes Admin Panel
+ */
+
+ :root {
+    --primary: #4e73df;
+    --secondary: #858796;
+    --success: #1cc88a;
+    --info: #36b9cc;
+    --warning: #f6c23e;
+    --danger: #e74a3b;
+    --light: #f8f9fc;
+    --dark: #5a5c69;
+    --white: #ffffff;
+    --sidebar-width: 250px;
+    --topbar-height: 4.375rem;
+}
+
+/* Sidebar Styles */
+#sidebar.toggled {
+    width: 0;
+    overflow: hidden;
+}
+
+#content-wrapper {
+    background-color: var(--light);
+    min-height: 100vh;
+    position: relative;
+}
+
+#sidebar.toggled + #content-wrapper {
+    margin-left: 0;
+}
+
+@media (max-width: 768px) {
+    #sidebar {
+        width: 0;
+        overflow: hidden;
+    }
+    
+    #sidebar.toggled {
+        width: var(--sidebar-width);
+    }
+    
+    #content-wrapper {
+        margin-left: 0;
+    }
+    
+    #sidebar.toggled + #content-wrapper {
+        margin-left: var(--sidebar-width);
+    }
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--dark);
+    font-weight: 700;
+}
+
+.text-gray-100 { color: #f8f9fc !important; }
+.text-gray-200 { color: #eaecf4 !important; }
+.text-gray-300 { color: #dddfeb !important; }
+.text-gray-400 { color: #d1d3e2 !important; }
+.text-gray-500 { color: #b7b9cc !important; }
+.text-gray-600 { color: #858796 !important; }
+.text-gray-700 { color: #6e707e !important; }
+.text-gray-800 { color: #5a5c69 !important; }
+.text-gray-900 { color: #3a3b45 !important; }
+
+/* Cards */
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: none;
+    border-radius: 0.35rem;
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    border-radius: calc(0.35rem - 1px) calc(0.35rem - 1px) 0 0;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid #e3e6f0;
+    background-color: var(--light);
+}
+
+.card-body {
+    padding: 1.25rem;
+}
+
+/* Border Cards */
+.border-left-primary { border-left: .25rem solid var(--primary) !important; }
+.border-left-secondary { border-left: .25rem solid var(--secondary) !important; }
+.border-left-success { border-left: .25rem solid var(--success) !important; }
+.border-left-info { border-left: .25rem solid var(--info) !important; }
+.border-left-warning { border-left: .25rem solid var(--warning) !important; }
+.border-left-danger { border-left: .25rem solid var(--danger) !important; }
+
+/* Charts */
+.chart-area {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+.chart-pie {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+/* Tables */
+.table-vertical-center td {
+    vertical-align: middle;
+}
+
+.table-actions .btn {
+    margin-right: 0.25rem;
+}
+
+/* Form Controls */
+.form-control-sm {
+    height: calc(1.5em + 0.5rem + 2px);
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    border-radius: 0.2rem;
+}
+
+.form-control-lg {
+    height: calc(1.5em + 1rem + 2px);
+    padding: 0.5rem 1rem;
+    font-size: 1.25rem;
+    line-height: 1.5;
+    border-radius: 0.3rem;
+}
+
+/* Custom Form Elements */
+.custom-checkbox .custom-control-label::before {
+    border-radius: 0.25rem;
+}
+
+.custom-checkbox .custom-control-input:checked ~ .custom-control-label::before {
+    background-color: var(--primary);
+}
+
+/* Image Upload Preview */
+.image-preview-container {
+    width: 150px;
+    height: 150px;
+    margin-top: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-preview {
+    max-width: 140px;
+    max-height: 140px;
+}
+
+/* Buttons */
+.btn-icon-split {
+    display: inline-flex;
+    align-items: center;
+}
+
+.btn-icon-split .icon {
+    background: rgba(0, 0, 0, 0.15);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: .375rem .75rem;
+}
+
+.btn-icon-split .text {
+    padding: .375rem .75rem;
+}
+
+/* Dashboard Stats */
+.stats-icon {
+    width: 3rem;
+    height: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+/* Sticky Footer */
+.sticky-footer {
+    padding: 2rem 0;
+    flex-shrink: 0;
+}
+
+/* Dark Mode Toggle */
+.dark-mode-toggle {
+    cursor: pointer;
+    width: 60px;
+    height: 30px;
+    background-color: #e2e2e2;
+    border-radius: 30px;
+    position: relative;
+    transition: all 0.3s ease-in-out;
+}
+
+.dark-mode-toggle::after {
+    content: '';
+    width: 28px;
+    height: 28px;
+    background-color: white;
+    border-radius: 50%;
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    transition: all 0.3s ease-in-out;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.dark-mode-toggle.active {
+    background-color: var(--primary);
+}
+
+.dark-mode-toggle.active::after {
+    transform: translateX(30px);
+}

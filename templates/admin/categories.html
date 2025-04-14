@@ -1,0 +1,151 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Categories - Long Island Perfumes{% endblock %}
+
+{% block extra_css %}
+<style>
+    .category-card {
+        transition: all 0.3s ease;
+    }
+    
+    .category-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    .category-count {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: rgba(78, 115, 223, 0.1);
+        color: #4e73df;
+        padding: 0.25rem 0.5rem;
+        border-radius: 30px;
+        font-size: 0.75rem;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Categories</h1>
+    <a href="{{ url_for('add_category') }}" class="d-sm-inline-block btn btn-sm btn-primary shadow-sm">
+        <i class="fas fa-plus fa-sm text-white-50 me-1"></i> Add New Category
+    </a>
+</div>
+
+{% if categories and categories|length > 0 %}
+<!-- Categories Grid -->
+<div class="row">
+    {% for category in categories %}
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow h-100 category-card">
+            <div class="card-body">
+                <span class="category-count">{{ category.product_count }} products</span>
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ category.name }}</div>
+                        <div class="small text-gray-600 mb-2">ID: {{ category._id }}</div>
+                        {% if category.description %}
+                        <p class="mb-0 text-gray-600 small">{{ category.description|truncate(100) }}</p>
+                        {% else %}
+                        <p class="mb-0 text-gray-500 small fst-italic">No description available</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer bg-light">
+                <div class="btn-group w-100">
+                    <a href="{{ url_for('edit_category', category_id=category._id) }}" class="btn btn-sm btn-info">
+                        <i class="fas fa-edit me-1"></i> Edit
+                    </a>
+                    <a href="{{ url_for('products') }}?category={{ category._id }}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-list me-1"></i> View Products
+                    </a>
+                    {% if category.product_count == 0 %}
+                    <a href="{{ url_for('delete_category', category_id=category._id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this category?')">
+                        <i class="fas fa-trash me-1"></i> Delete
+                    </a>
+                    {% else %}
+                    <button class="btn btn-sm btn-secondary" disabled data-bs-toggle="tooltip" title="Cannot delete category with products">
+                        <i class="fas fa-trash me-1"></i> Delete
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<!-- No Categories State -->
+<div class="card shadow mb-4">
+    <div class="card-body text-center py-5">
+        <div class="py-3">
+            <i class="fas fa-tags fa-4x text-gray-300 mb-3"></i>
+            <h4 class="text-gray-500 mb-3">No Categories Found</h4>
+            <p class="text-gray-500 mb-4">Get started by adding your first product category.</p>
+            <a href="{{ url_for('add_category') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i> Add New Category
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Quick Actions Card -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Category Management</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <div class="card border-left-info shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col-auto me-3">
+                                <i class="fas fa-sitemap fa-2x text-gray-300"></i>
+                            </div>
+                            <div class="col">
+                                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Need Help?</div>
+                                <div class="h6 mb-0 text-gray-800">Categories help you organize your products</div>
+                                <small class="text-gray-600">Each product can belong to one category</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 mb-3">
+                <div class="card border-left-warning shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col-auto me-3">
+                                <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                            </div>
+                            <div class="col">
+                                <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Important Note</div>
+                                <div class="h6 mb-0 text-gray-800">Categories with products cannot be deleted</div>
+                                <small class="text-gray-600">Reassign products first before deleting categories</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize tooltips
+        const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+        const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
+    });
+</script>
+{% endblock %}

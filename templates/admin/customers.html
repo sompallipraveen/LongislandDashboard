@@ -1,0 +1,78 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Customers - Long Island Perfumes{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Customers</h1>
+</div>
+
+<!-- Simple Search -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Search Customers</h6>
+    </div>
+    <div class="card-body">
+        <form action="{{ url_for('customers') }}" method="get">
+            <div class="input-group">
+                <input type="text" class="form-control" name="q" placeholder="Search by name or email..." value="{{ search_query }}">
+                <button class="btn btn-primary" type="submit">
+                    <i class="fas fa-search"></i> Search
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Customers Table -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">All Customers ({{ customers|length }})</h6>
+    </div>
+    <div class="card-body">
+        {% if customers and customers|length > 0 %}
+        <div class="table-responsive">
+            <table class="table table-bordered" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Joined</th>
+                        <th>Orders</th>
+                        <th>Spent</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for customer in customers %}
+                    <tr>
+                        <td>{{ customer.full_name }}</td>
+                        <td>{{ customer.email }}</td>
+                        <td>{{ customer.created_at|format_date }}</td>
+                        <td>{{ customer.order_count|default(0) }}</td>
+                        <td>{{ customer.total_spent|default(0)|format_currency }}</td>
+                        <td>
+                            <div class="btn-group">
+                                <a href="{{ url_for('customer_detail', customer_id=customer._id) }}" class="btn btn-sm btn-info">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="mailto:{{ customer.email }}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-envelope"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-users fa-4x text-gray-300 mb-3"></i>
+            <h4 class="text-gray-500 mb-3">No Customers Found</h4>
+            <p class="text-gray-500 mb-0">Try a different search term or add customers to your store.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

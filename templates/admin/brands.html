@@ -1,0 +1,243 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Manage Brands - Long Island Fragrances{% endblock %}
+
+{% block extra_css %}
+<style>
+    .brand-logo {
+        width: 50px;
+        height: 50px;
+        object-fit: contain;
+        border-radius: 4px;
+        background-color: #f8f9fc;
+    }
+    
+    .logo-placeholder {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #f8f9fc;
+        color: #d1d3e2;
+        border-radius: 4px;
+        font-size: 20px;
+    }
+    
+    .table-responsive {
+        overflow-x: auto;
+    }
+    
+    .badge-count {
+        background-color: #4e73df;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-weight: normal;
+    }
+    
+    .brand-description {
+        max-width: 300px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Manage Brands</h1>
+    <a href="{{ url_for('add_brand') }}" class="d-sm-inline-block btn btn-sm btn-primary shadow-sm">
+        <i class="fas fa-plus fa-sm text-white-50 me-1"></i> Add New Brand
+    </a>
+</div>
+
+<!-- Brands List Card -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+        <h6 class="m-0 font-weight-bold text-primary">All Brands</h6>
+        <div class="dropdown no-arrow">
+            <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+            </a>
+            <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in" aria-labelledby="dropdownMenuLink">
+                <div class="dropdown-header">Brand Actions:</div>
+                <a class="dropdown-item" href="{{ url_for('add_brand') }}">Add New Brand</a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item" href="#" id="exportBrands">Export Brands</a>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if brands %}
+        <div class="mb-3">
+            <div class="input-group">
+                <input type="text" class="form-control" id="brandSearch" placeholder="Search brands...">
+                <button class="btn btn-outline-secondary" type="button">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-bordered" id="brandsTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>Logo</th>
+                        <th>Brand Name</th>
+                        <th>Description</th>
+                        <th>Products</th>
+                        <th>Created Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for brand in brands %}
+                    <tr>
+                        <td class="text-center">
+                            {% if brand.logo_id %}
+                            <img src="{{ url_for('serve_image', image_id=brand.logo_id) }}" alt="{{ brand.name }} Logo" class="brand-logo">
+                            {% else %}
+                            <div class="logo-placeholder">
+                                <i class="fas fa-building"></i>
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td>{{ brand.name }}</td>
+                        <td>
+                            <div class="brand-description" title="{{ brand.description }}">
+                                {{ brand.description or 'No description available' }}
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge-count">{{ brand.product_count }}</span>
+                        </td>
+                        <td>{{ brand.created_at|format_date }}</td>
+                        <td>
+                            <div class="btn-group">
+                                <a href="{{ url_for('edit_brand', brand_id=brand._id) }}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                {% if brand.product_count == 0 %}
+                                <a href="#" class="btn btn-sm btn-danger delete-brand" data-brand-id="{{ brand._id }}" data-brand-name="{{ brand.name }}">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                                {% else %}
+                                <button class="btn btn-sm btn-danger" disabled title="Cannot delete brand with products">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <i class="fas fa-building fa-4x mb-3 text-gray-300"></i>
+            <p class="mb-0">No brands found. Get started by adding your first brand.</p>
+            <a href="{{ url_for('add_brand') }}" class="btn btn-primary mt-3">
+                <i class="fas fa-plus me-1"></i> Add New Brand
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Delete Brand Modal -->
+<div class="modal fade" id="deleteBrandModal" tabindex="-1" aria-labelledby="deleteBrandModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteBrandModalLabel">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the brand "<span id="deleteBrandName"></span>"?</p>
+                <p class="text-danger mb-0"><strong>This action cannot be undone.</strong></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <a href="#" id="confirmDeleteBrand" class="btn btn-danger">Delete Brand</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Search functionality
+        const searchInput = document.getElementById('brandSearch');
+        const table = document.getElementById('brandsTable');
+        const rows = table ? table.getElementsByTagName('tbody')[0].getElementsByTagName('tr') : [];
+        
+        searchInput.addEventListener('keyup', function() {
+            const term = this.value.toLowerCase();
+            
+            for (let i = 0; i < rows.length; i++) {
+                const brandName = rows[i].getElementsByTagName('td')[1].textContent.toLowerCase();
+                const description = rows[i].getElementsByTagName('td')[2].textContent.toLowerCase();
+                
+                if (brandName.indexOf(term) > -1 || description.indexOf(term) > -1) {
+                    rows[i].style.display = '';
+                } else {
+                    rows[i].style.display = 'none';
+                }
+            }
+        });
+        
+        // Delete brand functionality
+        const deleteButtons = document.querySelectorAll('.delete-brand');
+        const deleteBrandModal = document.getElementById('deleteBrandModal');
+        const deleteBrandName = document.getElementById('deleteBrandName');
+        const confirmDeleteBrand = document.getElementById('confirmDeleteBrand');
+        
+        deleteButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                const brandId = this.getAttribute('data-brand-id');
+                const brandName = this.getAttribute('data-brand-name');
+                
+                deleteBrandName.textContent = brandName;
+                confirmDeleteBrand.href = "{{ url_for('delete_brand', brand_id='') }}" + brandId;
+                
+                // Show the modal
+                const modal = new bootstrap.Modal(deleteBrandModal);
+                modal.show();
+            });
+        });
+        
+        // Export brands functionality
+        document.getElementById('exportBrands').addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Create CSV content
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Brand Name,Description,Products,Created Date\n";
+            
+            {% for brand in brands %}
+            csvContent += "{{ brand.name }}," + 
+                          "\"{{ brand.description|default('') }}\","+
+                          "{{ brand.product_count }}," + 
+                          "{{ brand.created_at|format_date }}\n";
+            {% endfor %}
+            
+            // Create download link
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "brands_export_{{ now|format_date }}.csv");
+            document.body.appendChild(link);
+            
+            // Trigger download and remove link
+            link.click();
+            document.body.removeChild(link);
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,255 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Payment Transactions - Admin Panel{% endblock %}
+
+{% block content %}
+<!-- Page Heading -->
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Payment Transactions</h1>
+</div>
+
+<!-- Filter Card -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Filter Transactions</h6>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label for="date_from" class="form-label">From Date</label>
+                <input type="date" class="form-control" id="date_from" name="date_from" value="{{ date_from }}">
+            </div>
+            <div class="col-md-3">
+                <label for="date_to" class="form-label">To Date</label>
+                <input type="date" class="form-control" id="date_to" name="date_to" value="{{ date_to }}">
+            </div>
+            <div class="col-md-3">
+                <label for="status" class="form-label">Status</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">All Statuses</option>
+                    <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>Completed</option>
+                    <option value="pending" {% if current_status == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="failed" {% if current_status == 'failed' %}selected{% endif %}>Failed</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="q" class="form-label">Search</label>
+                <input type="text" class="form-control" id="q" name="q" value="{{ search_query }}" placeholder="Order ID, Email, etc.">
+            </div>
+            <div class="col-md-2">
+                <label for="min_amount" class="form-label">Min Amount</label>
+                <input type="number" class="form-control" id="min_amount" name="min_amount" value="{{ min_amount }}" placeholder="$" step="0.01">
+            </div>
+            <div class="col-md-2">
+                <label for="max_amount" class="form-label">Max Amount</label>
+                <input type="number" class="form-control" id="max_amount" name="max_amount" value="{{ max_amount }}" placeholder="$" step="0.01">
+            </div>
+            <div class="col-md-8 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary">Apply Filters</button>
+                <a href="{{ url_for('payment_transactions') }}" class="btn btn-secondary ms-2">Reset Filters</a>
+                
+                <div class="ms-auto">
+                    <span class="text-muted me-2">{{ count }} transactions</span>
+                    <span class="fw-bold">Total: ${{ total_amount|round(2) }}</span>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Transactions Table -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">Transactions</h6>
+        <div>
+            <a href="#" class="btn btn-sm btn-success" onclick="exportToCSV()">
+                <i class="fas fa-file-csv me-1"></i> Export to CSV
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover" id="transactionsTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Payment ID</th>
+                        <th>Status</th>
+                        <th>Amount</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in transactions %}
+                    <tr>
+                        <td>{{ tx.created_at|format_datetime }}</td>
+                        <td><a href="{{ url_for('order_detail', order_id=tx._id) }}">#{{ tx._id }}</a></td>
+                        <td>
+                            {{ tx.shipping_address.full_name }}<br>
+                            <small>{{ tx.shipping_address.email }}</small>
+                        </td>
+                        <td>
+                            {% if tx.payment_intent_id %}
+                            <small class="text-muted">{{ tx.payment_intent_id }}</small>
+                            {% else %}
+                            <small class="text-muted">N/A</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if tx.payment_status == 'completed' %}
+                            <span class="badge bg-success">Completed</span>
+                            {% elif tx.payment_status == 'pending' %}
+                            <span class="badge bg-warning">Pending</span>
+                            {% elif tx.payment_status == 'failed' %}
+                            <span class="badge bg-danger">Failed</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ tx.payment_status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>${{ tx.total|round(2) }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('order_detail', order_id=tx._id) }}" class="btn btn-info" data-bs-toggle="tooltip" title="View Order">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center">No transactions found matching your criteria</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Summary Card -->
+<div class="row">
+    <!-- Total Revenue Card -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Total Revenue</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">${{ total_amount|round(2) }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Number of Transactions Card -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            Number of Transactions</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ count }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-credit-card fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Average Order Value Card -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            Average Order Value</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            ${{ (total_amount / count)|round(2) if count > 0 else '0.00' }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-receipt fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Breakdown Card -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            Status Breakdown</div>
+                        <div class="my-2">
+                            {% set completed_count = transactions|selectattr('payment_status', 'eq', 'completed')|list|length %}
+                            {% set pending_count = transactions|selectattr('payment_status', 'eq', 'pending')|list|length %}
+                            {% set failed_count = transactions|selectattr('payment_status', 'eq', 'failed')|list|length %}
+                            
+                            <span class="badge bg-success">{{ completed_count }} Completed</span>
+                            <span class="badge bg-warning">{{ pending_count }} Pending</span>
+                            <span class="badge bg-danger">{{ failed_count }} Failed</span>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-clipboard-check fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function exportToCSV() {
+        // Get table data
+        const table = document.getElementById('transactionsTable');
+        let csv = [];
+        const rows = table.querySelectorAll('tr');
+        
+        for (let i = 0; i < rows.length; i++) {
+            const row = [], cols = rows[i].querySelectorAll('td, th');
+            
+            for (let j = 0; j < cols.length; j++) {
+                // Clean the text content - remove extra spaces and newlines
+                let data = cols[j].textContent.replace(/(\r\n|\n|\r)/gm, ' ').trim();
+                // Escape double quotes with double quotes
+                data = data.replace(/"/g, '""');
+                // Add the data to the row array
+                row.push('"' + data + '"');
+            }
+            
+            csv.push(row.join(','));
+        }
+        
+        // Create CSV file
+        const csvString = csv.join('\n');
+        const filename = 'payment_transactions_' + new Date().toISOString().slice(0, 10) + '.csv';
+        
+        // Create download link
+        const link = document.createElement('a');
+        link.style.display = 'none';
+        link.setAttribute('target', '_blank');
+        link.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvString));
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>
+{% endblock %}

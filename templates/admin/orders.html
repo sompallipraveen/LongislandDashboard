@@ -1,0 +1,603 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Orders - Long Island Perfumes{% endblock %}
+
+{% block extra_css %}
+<style>
+    .status-badge {
+        min-width: 100px;
+        text-align: center;
+    }
+    
+    .table-actions .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+    }
+    
+    .filter-card {
+        background-color: #f8f9fc;
+    }
+    
+    .order-card {
+        transition: all 0.2s ease;
+    }
+    
+    .order-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Orders</h1>
+    <div>
+        <button type="button" class="btn btn-sm btn-outline-primary me-2">
+            <i class="fas fa-file-export fa-sm text-primary-50 me-1"></i> Export Orders
+        </button>
+        <a href="#" class="btn btn-sm btn-primary shadow-sm" onclick="window.print();">
+            <i class="fas fa-print fa-sm text-white-50 me-1"></i> Print Orders
+        </a>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">Filter Orders</h6>
+        <button class="btn btn-sm btn-link text-primary" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse" aria-expanded="false" aria-controls="filterCollapse">
+            <i class="fas fa-filter"></i> Filters
+        </button>
+    </div>
+    <div class="collapse" id="filterCollapse">
+        <div class="card-body bg-light">
+            <form action="{{ url_for('orders') }}" method="get">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label for="status" class="form-label">Order Status</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="">All Statuses</option>
+                            <option value="pending" {% if current_status == 'pending' %}selected{% endif %}>Pending</option>
+                            <option value="processing" {% if current_status == 'processing' %}selected{% endif %}>Processing</option>
+                            <option value="shipped" {% if current_status == 'shipped' %}selected{% endif %}>Shipped</option>
+                            <option value="delivered" {% if current_status == 'delivered' %}selected{% endif %}>Delivered</option>
+                            <option value="cancelled" {% if current_status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="date_from" class="form-label">Date From</label>
+                        <input type="date" class="form-control" id="date_from" name="date_from">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="date_to" class="form-label">Date To</label>
+                        <input type="date" class="form-control" id="date_to" name="date_to">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="sort" class="form-label">Sort By</label>
+                        <select class="form-select" id="sort" name="sort">
+                            <option value="date_desc">Date (Newest First)</option>
+                            <option value="date_asc">Date (Oldest First)</option>
+                            <option value="total_desc">Total (High to Low)</option>
+                            <option value="total_asc">Total (Low to High)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-6 mb-3">
+                        <label for="search" class="form-label">Search</label>
+                        <input type="text" class="form-control" id="search" name="q" placeholder="Search by order ID, customer name, or email...">
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end mb-3">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fas fa-search me-1"></i> Apply Filters
+                        </button>
+                        <a href="{{ url_for('orders') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-redo me-1"></i> Reset Filters
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Order Status Cards -->
+<div class="row mb-4">
+    <div class="col">
+        <a href="{{ url_for('orders') }}?status=pending" class="text-decoration-none">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col-auto me-3">
+                            <i class="fas fa-clock fa-2x text-gray-300"></i>
+                        </div>
+                        <div class="col">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pending</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ pending_count|default(0) }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    
+    <div class="col">
+        <a href="{{ url_for('orders') }}?status=processing" class="text-decoration-none">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col-auto me-3">
+                            <i class="fas fa-spinner fa-2x text-gray-300"></i>
+                        </div>
+                        <div class="col">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Processing</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ processing_count|default(0) }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    
+    <div class="col">
+        <a href="{{ url_for('orders') }}?status=shipped" class="text-decoration-none">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col-auto me-3">
+                            <i class="fas fa-shipping-fast fa-2x text-gray-300"></i>
+                        </div>
+                        <div class="col">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Shipped</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ shipped_count|default(0) }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    
+    <div class="col">
+        <a href="{{ url_for('orders') }}?status=delivered" class="text-decoration-none">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col-auto me-3">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                        <div class="col">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Delivered</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ delivered_count|default(0) }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    
+    <div class="col">
+        <a href="{{ url_for('orders') }}?status=cancelled" class="text-decoration-none">
+            <div class="card border-left-danger shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col-auto me-3">
+                            <i class="fas fa-times-circle fa-2x text-gray-300"></i>
+                        </div>
+                        <div class="col">
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Cancelled</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ cancelled_count|default(0) }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- Orders Table -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">
+            {% if current_status %}
+                {{ current_status|capitalize }} Orders ({{ orders|length }})
+            {% else %}
+                All Orders ({{ orders|length }})
+            {% endif %}
+        </h6>
+        <div>
+            <span class="text-muted me-2">Total: {{ total_amount|format_currency }}</span>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if orders and orders|length > 0 %}
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover" id="ordersTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Date</th>
+                        <th>Customer</th>
+                        <th>Items</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr class="order-card">
+                        <td>
+                            <a href="{{ url_for('order_detail', order_id=order._id) }}" class="fw-bold text-primary">
+                                #{{ order._id }}
+                            </a>
+                        </td>
+                        <td>{{ order.created_at|format_date }}</td>
+                        <td>{{ order.shipping_address.full_name }}<br>
+                            <small class="text-muted">{{ order.shipping_address.email }}</small>
+                        </td>
+                        <td>
+                            {% if order.items and order.items is iterable %}
+                            {% set item_count = order.items|length %}
+                        {% else %}
+                            {% set item_count = 0 %}
+                        {% endif %}
+                        {{ item_count }} item{% if item_count != 1 %}s{% endif %}
+                        </td>
+                        <td>{{ order.total|format_currency }}</td>
+                        <td>
+                            {% if order.status == 'pending' %}
+                            <span class="badge bg-warning text-dark status-badge">Pending</span>
+                            {% elif order.status == 'processing' %}
+                            <span class="badge bg-info status-badge">Processing</span>
+                            {% elif order.status == 'shipped' %}
+                            <span class="badge bg-primary status-badge">Shipped</span>
+                            {% elif order.status == 'delivered' %}
+                            <span class="badge bg-success status-badge">Delivered</span>
+                            {% elif order.status == 'cancelled' %}
+                            <span class="badge bg-danger status-badge">Cancelled</span>
+                            {% endif %}
+                        </td>
+                        <td class="table-actions">
+                            <div class="btn-group">
+                                <a href="{{ url_for('order_detail', order_id=order._id) }}" class="btn btn-info btn-sm" data-bs-toggle="tooltip" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <button type="button" class="btn btn-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                    Update
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li>
+                                        <h6 class="dropdown-header">Change Status</h6>
+                                    </li>
+                                    {% if order.status != 'pending' %}
+                                    <li>
+                                        <form action="{{ url_for('update_order_status', order_id=order._id) }}" method="post" class="d-inline">
+                                            <input type="hidden" name="status" value="pending">
+                                            <button type="submit" class="dropdown-item">
+                                                <i class="fas fa-clock me-1 text-warning"></i> Pending
+                                            </button>
+                                        </form>
+                                    </li>
+                                    {% endif %}
+                                    
+                                    {% if order.status != 'processing' %}
+                                    <li>
+                                        <form action="{{ url_for('update_order_status', order_id=order._id) }}" method="post" class="d-inline">
+                                            <input type="hidden" name="status" value="processing">
+                                            <button type="submit" class="dropdown-item">
+                                                <i class="fas fa-spinner me-1 text-info"></i> Processing
+                                            </button>
+                                        </form>
+                                    </li>
+                                    {% endif %}
+                                    
+                                    {% if order.status != 'shipped' %}
+                                    <li>
+                                        <form action="{{ url_for('update_order_status', order_id=order._id) }}" method="post" class="d-inline">
+                                            <input type="hidden" name="status" value="shipped">
+                                            <button type="submit" class="dropdown-item">
+                                                <i class="fas fa-shipping-fast me-1 text-primary"></i> Shipped
+                                            </button>
+                                        </form>
+                                    </li>
+                                    {% endif %}
+                                    
+                                    {% if order.status != 'delivered' %}
+                                    <li>
+                                        <form action="{{ url_for('update_order_status', order_id=order._id) }}" method="post" class="d-inline">
+                                            <input type="hidden" name="status" value="delivered">
+                                            <button type="submit" class="dropdown-item">
+                                                <i class="fas fa-check-circle me-1 text-success"></i> Delivered
+                                            </button>
+                                        </form>
+                                    </li>
+                                    {% endif %}
+                                    
+                                    {% if order.status != 'cancelled' %}
+                                    <li>
+                                        <form action="{{ url_for('update_order_status', order_id=order._id) }}" method="post" class="d-inline">
+                                            <input type="hidden" name="status" value="cancelled">
+                                            <button type="submit" class="dropdown-item">
+                                                <i class="fas fa-times-circle me-1 text-danger"></i> Cancelled
+                                            </button>
+                                        </form>
+                                    </li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-shopping-bag fa-4x text-gray-300 mb-3"></i>
+            <h4 class="text-gray-500 mb-3">No Orders Found</h4>
+            <p class="text-gray-500 mb-0">There are no orders matching your criteria</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Bulk Actions Card -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Bulk Actions</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3 mb-3">
+                <a href="#" class="btn btn-outline-primary w-100" data-bs-toggle="modal" data-bs-target="#exportOrdersModal">
+                    <i class="fas fa-file-export me-1"></i> Export Orders
+                </a>
+            </div>
+            <div class="col-md-3 mb-3">
+                <a href="#" class="btn btn-outline-success w-100" onclick="window.print();">
+                    <i class="fas fa-print me-1"></i> Print Orders
+                </a>
+            </div>
+            <div class="col-md-3 mb-3">
+                <a href="#" class="btn btn-outline-info w-100" data-bs-toggle="modal" data-bs-target="#bulkUpdateModal">
+                    <i class="fas fa-tasks me-1"></i> Bulk Update Status
+                </a>
+            </div>
+            <div class="col-md-3 mb-3">
+                <a href="#" class="btn btn-outline-warning w-100" data-bs-toggle="modal" data-bs-target="#emailCustomersModal">
+                    <i class="fas fa-envelope me-1"></i> Email Customers
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Export Orders Modal -->
+<div class="modal fade" id="exportOrdersModal" tabindex="-1" aria-labelledby="exportOrdersModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exportOrdersModalLabel">Export Orders</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="exportForm">
+                    <div class="mb-3">
+                        <label class="form-label">Export Format</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="export_format" id="formatCSV" value="csv" checked>
+                            <label class="form-check-label" for="formatCSV">
+                                CSV
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="export_format" id="formatXLSX" value="xlsx">
+                            <label class="form-check-label" for="formatXLSX">
+                                Excel (XLSX)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="export_format" id="formatPDF" value="pdf">
+                            <label class="form-check-label" for="formatPDF">
+                                PDF
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Date Range</label>
+                        <div class="row">
+                            <div class="col-6">
+                                <input type="date" class="form-control" id="export_date_from" name="export_date_from">
+                                <label class="form-text">From</label>
+                            </div>
+                            <div class="col-6">
+                                <input type="date" class="form-control" id="export_date_to" name="export_date_to">
+                                <label class="form-text">To</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Order Status</label>
+                        <select class="form-select" id="export_status" name="export_status">
+                            <option value="">All Statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="processing">Processing</option>
+                            <option value="shipped">Shipped</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="exportButton">Export</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Update Modal -->
+<div class="modal fade" id="bulkUpdateModal" tabindex="-1" aria-labelledby="bulkUpdateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bulkUpdateModalLabel">Bulk Update Orders</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="bulkUpdateForm">
+                    <div class="mb-3">
+                        <label for="bulk_status" class="form-label">Set Status For All Selected Orders</label>
+                        <select class="form-select" id="bulk_status" name="bulk_status" required>
+                            <option value="">Choose Status...</option>
+                            <option value="pending">Pending</option>
+                            <option value="processing">Processing</option>
+                            <option value="shipped">Shipped</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="bulk_filter" class="form-label">Apply To</label>
+                        <select class="form-select" id="bulk_filter" name="bulk_filter">
+                            <option value="all">All Orders</option>
+                            <option value="selected">Selected Orders</option>
+                            <option value="filtered">Filtered Orders</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="bulk_notify" name="bulk_notify">
+                        <label class="form-check-label" for="bulk_notify">
+                            Notify customers about status change
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="bulkUpdateButton">Update Orders</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Email Customers Modal -->
+<div class="modal fade" id="emailCustomersModal" tabindex="-1" aria-labelledby="emailCustomersModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="emailCustomersModalLabel">Email Customers</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="emailCustomersForm">
+                    <div class="mb-3">
+                        <label for="email_subject" class="form-label">Email Subject</label>
+                        <input type="text" class="form-control" id="email_subject" name="email_subject" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email_message" class="form-label">Email Message</label>
+                        <textarea class="form-control" id="email_message" name="email_message" rows="5" required></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email_recipients" class="form-label">Recipients</label>
+                        <select class="form-select" id="email_recipients" name="email_recipients">
+                            <option value="all">All Customers</option>
+                            <option value="recent">Recent Orders (30 days)</option>
+                            <option value="pending">Pending Orders</option>
+                            <option value="shipped">Shipped Orders</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="email_test" name="email_test" checked>
+                        <label class="form-check-label" for="email_test">
+                            Send test email to me first
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="sendEmailButton">Send Email</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize tooltips
+        const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+        const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
+        
+        // Initialize DataTable if available
+        if (typeof DataTable !== 'undefined' && document.getElementById('ordersTable')) {
+            const table = new DataTable('#ordersTable', {
+                pageLength: 25,
+                lengthMenu: [25, 50, 100, 200],
+                order: [[1, 'desc']] // Sort by date column by default, newest first
+            });
+        }
+        
+        // Set filter values from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('date_from')) {
+            document.getElementById('date_from').value = urlParams.get('date_from');
+        }
+        if (urlParams.has('date_to')) {
+            document.getElementById('date_to').value = urlParams.get('date_to');
+        }
+        if (urlParams.has('sort')) {
+            document.getElementById('sort').value = urlParams.get('sort');
+        }
+        if (urlParams.has('q')) {
+            document.getElementById('search').value = urlParams.get('q');
+        }
+        
+        // Show filter collapse if any filter is active
+        if (urlParams.toString()) {
+            const filterCollapse = document.getElementById('filterCollapse');
+            if (filterCollapse) {
+                const bsCollapse = new bootstrap.Collapse(filterCollapse, {
+                    toggle: true
+                });
+            }
+        }
+        
+        // Handle export button click
+        document.getElementById('exportButton')?.addEventListener('click', function() {
+            // In a real app, this would submit the form or trigger an AJAX request
+            alert('Export functionality would be implemented here');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('exportOrdersModal'));
+            modal.hide();
+        });
+        
+        // Handle bulk update button click
+        document.getElementById('bulkUpdateButton')?.addEventListener('click', function() {
+            // In a real app, this would submit the form or trigger an AJAX request
+            alert('Bulk update functionality would be implemented here');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('bulkUpdateModal'));
+            modal.hide();
+        });
+        
+        // Handle send email button click
+        document.getElementById('sendEmailButton')?.addEventListener('click', function() {
+            // In a real app, this would submit the form or trigger an AJAX request
+            alert('Email sending functionality would be implemented here');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('emailCustomersModal'));
+            modal.hide();
+        });
+    });
+</script>
+{% endblock %}

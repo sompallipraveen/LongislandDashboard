@@ -1,0 +1,135 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Payment Transactions - Admin Panel{% endblock %}
+
+{% block content %}
+<!-- Page Heading -->
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Payment Transactions</h1>
+    <div>
+        <a href="{{ url_for('payments_dashboard') }}" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm">
+            <i class="fas fa-chart-bar fa-sm text-white-50 me-1"></i> Payment Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Filter Card -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Filter Transactions</h6>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label for="date_from" class="form-label">From Date</label>
+                <input type="date" class="form-control" id="date_from" name="date_from" value="{{ date_from }}">
+            </div>
+            <div class="col-md-3">
+                <label for="date_to" class="form-label">To Date</label>
+                <input type="date" class="form-control" id="date_to" name="date_to" value="{{ date_to }}">
+            </div>
+            <div class="col-md-3">
+                <label for="status" class="form-label">Status</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">All Statuses</option>
+                    <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>Completed</option>
+                    <option value="pending" {% if current_status == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="failed" {% if current_status == 'failed' %}selected{% endif %}>Failed</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="q" class="form-label">Search</label>
+                <input type="text" class="form-control" id="q" name="q" value="{{ search_query }}" placeholder="Order ID, Email, etc.">
+            </div>
+            <div class="col-md-2">
+                <label for="min_amount" class="form-label">Min Amount</label>
+                <input type="number" class="form-control" id="min_amount" name="min_amount" value="{{ min_amount }}" placeholder="$" step="0.01">
+            </div>
+            <div class="col-md-2">
+                <label for="max_amount" class="form-label">Max Amount</label>
+                <input type="number" class="form-control" id="max_amount" name="max_amount" value="{{ max_amount }}" placeholder="$" step="0.01">
+            </div>
+            <div class="col-md-8 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary">Apply Filters</button>
+                <a href="{{ url_for('payment_transactions') }}" class="btn btn-secondary ms-2">Reset Filters</a>
+                
+                <div class="ms-auto">
+                    <span class="text-muted me-2">{{ count }} transactions</span>
+                    <span class="fw-bold">Total: ${{ total_amount|round(2) }}</span>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Transactions Table -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Transactions</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover" id="transactionsTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Payment ID</th>
+                        <th>Status</th>
+                        <th>Amount</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in transactions %}
+                    <tr>
+                        <td>{{ tx.created_at|format_datetime }}</td>
+                        <td><a href="{{ url_for('order_detail', order_id=tx._id) }}">#{{ tx._id }}</a></td>
+                        <td>
+                            {{ tx.shipping_address.full_name }}<br>
+                            <small>{{ tx.shipping_address.email }}</small>
+                        </td>
+                        <td>
+                            {% if tx.payment_intent_id %}
+                            <small class="text-muted">{{ tx.payment_intent_id }}</small>
+                            {% else %}
+                            <small class="text-muted">N/A</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if tx.payment_status == 'completed' %}
+                            <span class="badge bg-success">Completed</span>
+                            {% elif tx.payment_status == 'pending' %}
+                            <span class="badge bg-warning">Pending</span>
+                            {% elif tx.payment_status == 'failed' %}
+                            <span class="badge bg-danger">Failed</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ tx.payment_status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>${{ tx.total|round(2) }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('order_detail', order_id=tx._id) }}" class="btn btn-info" data-bs-toggle="tooltip" title="View Order">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if tx.payment_intent_id %}
+                                <a href="{{ url_for('order_detail', order_id=tx._id) }}" class="btn btn-primary" data-bs-toggle="tooltip" title="View Order/Payment">
+                                    <i class="fas fa-credit-card"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center">No transactions found matching your criteria</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

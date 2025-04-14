@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin Panel - Long Island Perfumes{% endblock %}</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {% block extra_css %}{% endblock %}
+
+    <style>
+        :root {
+            --sidebar-width: 250px;
+        }
+        
+        body {
+            overflow-x: hidden;
+            background-color: #f8f9fc;
+        }
+        
+        #wrapper {
+            display: flex;
+        }
+        
+        #sidebar {
+            width: var(--sidebar-width);
+            min-height: 100vh;
+            background-color: #4e73df;
+            background-image: linear-gradient(180deg, #4e73df 10%, #224abe 100%);
+            background-size: cover;
+            transition: all 0.3s;
+            position: fixed;
+            z-index: 1;
+            height: 100%;
+        }
+        
+        #content-wrapper {
+            width: 100%;
+            margin-left: var(--sidebar-width);
+            transition: all 0.3s;
+        }
+        
+        .sidebar-heading {
+            padding: 1.5rem 1rem;
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: white;
+            text-align: center;
+        }
+        
+        .sidebar-divider {
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            margin: 0 1rem;
+        }
+        
+        .nav-item .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 0.75rem 1rem;
+        }
+        
+        .nav-item .nav-link:hover {
+            color: #fff;
+        }
+        
+        .nav-item .nav-link i {
+            margin-right: 0.5rem;
+        }
+        
+        .nav-item.active .nav-link {
+            color: #fff;
+            font-weight: 700;
+        }
+        
+        .topbar {
+            height: 4.375rem;
+        }
+        
+        .card-header {
+            background-color: #f8f9fc;
+            border-bottom: 1px solid #e3e6f0;
+        }
+        
+        .border-left-primary {
+            border-left: .25rem solid #4e73df!important;
+        }
+        
+        .border-left-success {
+            border-left: .25rem solid #1cc88a!important;
+        }
+        
+        .border-left-info {
+            border-left: .25rem solid #36b9cc!important;
+        }
+        
+        .border-left-warning {
+            border-left: .25rem solid #f6c23e!important;
+        }
+        
+        .text-gray-300 {
+            color: #dddfeb!important;
+        }
+        
+        .text-gray-800 {
+            color: #5a5c69!important;
+        }
+        
+        .table-hover tbody tr:hover {
+            background-color: rgba(78, 115, 223, 0.05);
+        }
+        
+        .notification-badge {
+            position: absolute;
+            top: 0.2rem;
+            right: 0.2rem;
+            font-size: 0.6rem;
+            padding: 0.15rem 0.4rem;
+            background-color: #e74a3b;
+            color: white;
+            border-radius: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div id="wrapper">
+        <!-- Sidebar -->
+        <div id="sidebar">
+            <div class="sidebar-heading">
+                Long Island<br>
+                <small class="text-white-50">Admin Panel</small>
+            </div>
+            <hr class="sidebar-divider">
+            <ul class="nav flex-column">
+                <li class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <i class="fas fa-fw fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item {% if request.endpoint in ['products', 'add_product', 'edit_product'] %}active{% endif %}">
+                    <a class="nav-link" href="{{ url_for('products') }}">
+                        <i class="fas fa-fw fa-flask"></i>
+                        <span>Products</span>
+                    </a>
+                </li>
+                <li class="nav-item {% if request.endpoint in ['categories', 'add_category', 'edit_category'] %}active{% endif %}">
+                    <a class="nav-link" href="{{ url_for('categories') }}">
+                        <i class="fas fa-fw fa-tags"></i>
+                        <span>Categories</span>
+                    </a>
+                </li>
+                <li class="nav-item {% if request.endpoint in ['orders', 'order_detail'] %}active{% endif %}">
+                    <a class="nav-link" href="{{ url_for('orders') }}">
+                        <i class="fas fa-fw fa-shopping-bag"></i>
+                        <span>Orders</span>
+                    </a>
+                </li>
+                <li class="nav-item {% if request.endpoint in ['customers', 'customer_detail'] %}active{% endif %}">
+                    <a class="nav-link" href="{{ url_for('customers') }}">
+                        <i class="fas fa-fw fa-users"></i>
+                        <span>Customers</span>
+                    </a>
+                </li>
+                <!-- Add this to the sidebar menu, after the Orders section -->
+                <li class="nav-item {% if request.endpoint in ['payments_dashboard', 'payment_transactions', 'payment_detail'] %}active{% endif %}">
+                    <a class="nav-link" href="{{ url_for('payments_dashboard') }}">
+                        <i class="fas fa-fw fa-credit-card"></i>
+                        <span>Payments</span>
+                    </a>
+                </li>
+                <!-- New Contact Messages Nav Item -->
+                <li class="nav-item {% if request.endpoint in ['contact_messages', 'contact_message_detail'] %}active{% endif %}">
+                    <a class="nav-link position-relative" href="{{ url_for('contact_messages') }}">
+                        <i class="fas fa-fw fa-envelope"></i>
+                        <span>Contact Messages</span>
+                        <!-- Unread messages badge - This would need to be populated dynamically -->
+                        {% if session.get('unread_messages_count', 0) > 0 %}
+                        <span class="notification-badge">{{ session.get('unread_messages_count') }}</span>
+                        {% endif %}
+                    </a>
+                </li>
+                <li class="nav-item {% if request.endpoint == 'reports' %}active{% endif %}">
+                    <a class="nav-link" href="{{ url_for('reports') }}">
+                        <i class="fas fa-fw fa-chart-bar"></i>
+                        <span>Reports</span>
+                    </a>
+                </li>
+                <li class="nav-item {% if request.endpoint in ['brands', 'add_brand', 'edit_brand'] %}active{% endif %}">
+                    <a class="nav-link" href="{{ url_for('brands') }}">
+                        <i class="fas fa-fw fa-trademark"></i>
+                        <span>Brands</span>
+                    </a>
+                </li>
+                <li class="nav-item {% if request.endpoint == 'settings' %}active{% endif %}">
+                    <a class="nav-link" href="{{ url_for('settings') }}">
+                        <i class="fas fa-fw fa-cog"></i>
+                        <span>Settings</span>
+                    </a>
+                </li>
+                <hr class="sidebar-divider">
+                <li class="nav-item">
+                    <a class="nav-link" href="https://longisland-ecommerce.vercel.app/" target="_blank">
+                        <i class="fas fa-fw fa-eye"></i>
+                        <span>View Store</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('logout') }}">
+                        <i class="fas fa-fw fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Content Wrapper -->
+        <div id="content-wrapper">
+            <!-- Topbar -->
+            <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
+                <!-- Sidebar Toggle (Mobile) -->
+                <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
+                    <i class="fa fa-bars"></i>
+                </button>
+
+                <!-- Date Display -->
+                <div class="d-none d-sm-inline-block ml-md-3 my-2 my-md-0">
+                    <span class="text-muted">Today's Date:</span>
+                    <span class="fw-bold ms-2">{{ now.strftime('%B %d, %Y') }}</span>
+                </div>
+
+                <!-- Topbar Navbar -->
+                <ul class="navbar-nav ms-auto">
+                    <!-- Contact Messages Alert -->
+                    {% if session.get('unread_messages_count', 0) > 0 %}
+                    <li class="nav-item dropdown no-arrow mx-1">
+                        <a class="nav-link dropdown-toggle" href="#" id="messagesDropdown" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-envelope fa-fw"></i>
+                            <!-- Counter - Messages -->
+                            <span class="badge bg-danger badge-counter">{{ session.get('unread_messages_count') }}</span>
+                        </a>
+                        <!-- Dropdown - Messages -->
+                        <div class="dropdown-list dropdown-menu dropdown-menu-end shadow animated--grow-in"
+                            aria-labelledby="messagesDropdown">
+                            <h6 class="dropdown-header">
+                                New Contact Messages
+                            </h6>
+                            {% for message in session.get('recent_unread_messages', []) %}
+                            <a class="dropdown-item d-flex align-items-center" href="{{ url_for('contact_message_detail', message_id=message._id) }}">
+                                <div class="font-weight-bold">
+                                    <div class="text-truncate">{{ message.message|truncate(50) }}</div>
+                                    <div class="small text-gray-500">{{ message.name }} · {{ message.created_at|format_date }}</div>
+                                </div>
+                            </a>
+                            {% endfor %}
+                            <a class="dropdown-item text-center small text-gray-500" href="{{ url_for('contact_messages') }}?status=unread">View All Unread Messages</a>
+                        </div>
+                    </li>
+                    {% endif %}
+
+                    <div class="topbar-divider d-none d-sm-block"></div>
+
+                    <!-- Nav Item - User Information -->
+                    <li class="nav-item dropdown no-arrow">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="mr-2 d-none d-lg-inline text-gray-600 small">{{ session.full_name }}</span>
+                            <i class="fas fa-user-circle fa-fw"></i>
+                        </a>
+                        <!-- Dropdown - User Information -->
+                        <div class="dropdown-menu dropdown-menu-end shadow animated--grow-in" aria-labelledby="userDropdown">
+                            <a class="dropdown-item" href="{{ url_for('settings') }}">
+                                <i class="fas fa-cogs fa-sm fa-fw me-2 text-gray-400"></i>
+                                Settings
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item" href="{{ url_for('logout') }}">
+                                <i class="fas fa-sign-out-alt fa-sm fa-fw me-2 text-gray-400"></i>
+                                Logout
+                            </a>
+                        </div>
+                    </li>
+                </ul>
+            </nav>
+
+            <!-- Begin Page Content -->
+            <div class="container-fluid">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </div>
+            <!-- End Page Content -->
+
+            <!-- Footer -->
+            <footer class="sticky-footer bg-white mt-4">
+                <div class="container my-auto">
+                    <div class="copyright text-center my-auto">
+                        <span>Copyright &copy; Sompalli and Co {{ now.year }}</span>
+                    </div>
+                </div>
+            </footer>
+            <!-- End of Footer -->
+        </div>
+        <!-- End of Content Wrapper -->
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+
+    <script>
+        // Initialize tooltips
+        document.addEventListener('DOMContentLoaded', function() {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
+    </script>
+</body>
+</html>

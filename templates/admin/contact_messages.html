@@ -1,0 +1,304 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Contact Messages - Long Island Perfumes{% endblock %}
+
+{% block extra_css %}
+<style>
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .status-unread {
+        background-color: #4e73df;
+        color: white;
+    }
+    
+    .status-read {
+        background-color: #1cc88a;
+        color: white;
+    }
+    
+    .status-responded {
+        background-color: #36b9cc;
+        color: white;
+    }
+    
+    .status-spam {
+        background-color: #e74a3b;
+        color: white;
+    }
+    
+    .table-hover tbody tr:hover {
+        background-color: rgba(78, 115, 223, 0.05);
+    }
+    
+    .preview-text {
+        max-width: 250px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: inline-block;
+    }
+    
+    .highlight-unread {
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Contact Messages</h1>
+    <div>
+        <button type="button" class="btn btn-sm btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#bulkActionModal">
+            <i class="fas fa-cog fa-sm text-white-50 me-1"></i> Bulk Actions
+        </button>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">Filter Messages</h6>
+        <button class="btn btn-sm btn-link text-primary" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse" aria-expanded="false" aria-controls="filterCollapse">
+            <i class="fas fa-filter"></i> Filters
+        </button>
+    </div>
+    <div class="collapse" id="filterCollapse">
+        <div class="card-body bg-light">
+            <form action="{{ url_for('contact_messages') }}" method="get">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label for="status" class="form-label">Status</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="">All Statuses</option>
+                            <option value="unread" {% if current_status == 'unread' %}selected{% endif %}>Unread</option>
+                            <option value="read" {% if current_status == 'read' %}selected{% endif %}>Read</option>
+                            <option value="responded" {% if current_status == 'responded' %}selected{% endif %}>Responded</option>
+                            <option value="spam" {% if current_status == 'spam' %}selected{% endif %}>Spam</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="date_from" class="form-label">From Date</label>
+                        <input type="date" class="form-control" id="date_from" name="date_from" value="{{ date_from }}">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="date_to" class="form-label">To Date</label>
+                        <input type="date" class="form-control" id="date_to" name="date_to" value="{{ date_to }}">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="search" class="form-label">Search</label>
+                        <input type="text" class="form-control" id="search" name="q" placeholder="Search in messages..." value="{{ search_query or '' }}">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12 d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fas fa-search me-1"></i> Search
+                        </button>
+                        <a href="{{ url_for('contact_messages') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-redo me-1"></i> Reset
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Messages Table -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">All Messages ({{ messages|length }})</h6>
+    </div>
+    <div class="card-body">
+        {% if messages and messages|length > 0 %}
+        <form id="messagesForm" action="{{ url_for('bulk_update_messages') }}" method="post">
+            <input type="hidden" name="current_status" value="{{ current_status }}">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover" id="messagesTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th style="width: 20px;">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="selectAll">
+                                </div>
+                            </th>
+                            <th>From</th>
+                            <th>Message</th>
+                            <th>Date</th>
+                            <th style="width: 100px;">Status</th>
+                            <th style="width: 100px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for message in messages %}
+                        <tr class="{% if message.status == 'unread' %}table-active{% endif %}">
+                            <td>
+                                <div class="form-check">
+                                    <input class="form-check-input message-check" type="checkbox" name="selected_messages[]" value="{{ message._id }}">
+                                </div>
+                            </td>
+                            <td class="{% if message.status == 'unread' %}highlight-unread{% endif %}">
+                                <div>{{ message.name }}</div>
+                                <small class="text-muted">{{ message.email }}</small><br>
+                                {% if message.mobile %}
+                                <small class="text-muted">{{ message.mobile }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="preview-text {% if message.status == 'unread' %}highlight-unread{% endif %}">{{ message.message }}</span>
+                            </td>
+                            <td>
+                                {{ message.created_at|format_datetime }}
+                            </td>
+                            <td>
+                                <span class="badge status-badge status-{{ message.status }}">
+                                    {{ message.status|capitalize }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group">
+                                    <a href="{{ url_for('contact_message_detail', message_id=message._id) }}" class="btn btn-info btn-sm" data-bs-toggle="tooltip" title="View">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteModal{{ message._id }}" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                                
+                                <!-- Delete Modal -->
+                                <div class="modal fade" id="deleteModal{{ message._id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ message._id }}" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="deleteModalLabel{{ message._id }}">Confirm Delete</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p>Are you sure you want to delete this message from <strong>{{ message.name }}</strong>?</p>
+                                                <p class="text-muted">This action cannot be undone.</p>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <form action="{{ url_for('delete_contact_message', message_id=message._id) }}" method="post">
+                                                    <button type="submit" class="btn btn-danger">Delete</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </form>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-envelope fa-4x text-gray-300 mb-3"></i>
+            <h4 class="text-gray-800 mb-2">No messages found</h4>
+            <p class="text-gray-600">No contact messages matching your criteria were found.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Bulk Action Modal -->
+<div class="modal fade" id="bulkActionModal" tabindex="-1" aria-labelledby="bulkActionModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bulkActionModalLabel">Bulk Actions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="bulkActionForm" action="{{ url_for('bulk_update_messages') }}" method="post">
+                    <div class="mb-3">
+                        <label class="form-label">Select Action</label>
+                        <select class="form-select" name="bulk_status" required>
+                            <option value="">Select Action</option>
+                            <option value="read">Mark as Read</option>
+                            <option value="unread">Mark as Unread</option>
+                            <option value="responded">Mark as Responded</option>
+                            <option value="spam">Mark as Spam</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Apply to</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="bulk_filter" id="bulkSelected" value="selected" checked>
+                            <label class="form-check-label" for="bulkSelected">
+                                Selected Messages
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="bulk_filter" id="bulkFiltered" value="filtered">
+                            <label class="form-check-label" for="bulkFiltered">
+                                All Filtered Messages
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="bulk_filter" id="bulkAll" value="all">
+                            <label class="form-check-label" for="bulkAll">
+                                All Messages
+                            </label>
+                        </div>
+                    </div>
+                    <input type="hidden" name="current_status" value="{{ current_status }}">
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="bulkActionForm" class="btn btn-primary">Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize tooltips
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
+    
+    // Select all functionality
+    const selectAllCheckbox = document.getElementById('selectAll');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            const messageCheckboxes = document.querySelectorAll('.message-check');
+            messageCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+        });
+    }
+    
+    // Show filter collapse if any filter is active
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('status') || urlParams.has('date_from') || 
+        urlParams.has('date_to') || urlParams.has('q')) {
+        const filterCollapse = document.getElementById('filterCollapse');
+        if (filterCollapse) {
+            new bootstrap.Collapse(filterCollapse, { toggle: true });
+        }
+    }
+    
+    // Check if form can be submitted based on selection
+    document.getElementById('bulkActionForm').addEventListener('submit', function(e) {
+        const bulkFilter = document.querySelector('input[name="bulk_filter"]:checked').value;
+        
+        if (bulkFilter === 'selected') {
+            const selectedMessages = document.querySelectorAll('.message-check:checked');
+            if (selectedMessages.length === 0) {
+                e.preventDefault();
+                alert('Please select at least one message to perform this action.');
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

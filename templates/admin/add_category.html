@@ -1,0 +1,93 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Add New Category - Long Island Perfumes{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Add New Category</h1>
+    <a href="{{ url_for('categories') }}" class="d-sm-inline-block btn btn-sm btn-secondary shadow-sm">
+        <i class="fas fa-arrow-left fa-sm text-white-50 me-1"></i> Back to Categories
+    </a>
+</div>
+
+<!-- Category Form Card -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Category Information</h6>
+    </div>
+    <div class="card-body">
+        <form action="{{ url_for('add_category') }}" method="post">
+            <div class="row">
+                <div class="col-md-8 mx-auto">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Category Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                        <small class="text-muted">Choose a descriptive name for this category</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="4"></textarea>
+                        <small class="text-muted">Provide a brief description of what products belong in this category</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="display_order" class="form-label">Display Order</label>
+                        <input type="number" class="form-control" id="display_order" name="display_order" value="0" min="0">
+                        <small class="text-muted">Categories with lower numbers will appear first in listings</small>
+                    </div>
+                    
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="is_visible" name="is_visible" checked>
+                        <label class="form-check-label" for="is_visible">
+                            Visible on store
+                        </label>
+                        <br>
+                        <small class="text-muted">Uncheck to hide this category from customers</small>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-flex justify-content-end">
+                        <button type="reset" class="btn btn-secondary me-2">
+                            <i class="fas fa-redo me-1"></i> Reset
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i> Add Category
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Category Tips Card -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Tips for Creating Categories</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h5 class="text-gray-800"><i class="fas fa-check-circle text-success me-2"></i> Do</h5>
+                <ul class="text-gray-600">
+                    <li>Use clear, descriptive names</li>
+                    <li>Create logical groupings of products</li>
+                    <li>Consider your customers' shopping habits</li>
+                    <li>Use consistent naming conventions</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h5 class="text-gray-800"><i class="fas fa-times-circle text-danger me-2"></i> Don't</h5>
+                <ul class="text-gray-600">
+                    <li>Create too many categories</li>
+                    <li>Use overly technical terms</li>
+                    <li>Create categories with only 1-2 products</li>
+                    <li>Make category names too long</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Add New Brand - Long Island Fragrances{% endblock %}
+
+{% block extra_css %}
+<style>
+    .image-preview-container {
+        width: 150px;
+        height: 150px;
+        border: 1px dashed #ccc;
+        border-radius: 5px;
+        margin-top: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+    
+    .image-preview {
+        max-width: 100%;
+        max-height: 100%;
+    }
+    
+    .required-field::after {
+        content: "*";
+        color: #e74a3b;
+        margin-left: 4px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Add New Brand</h1>
+    <a href="{{ url_for('brands') }}" class="d-sm-inline-block btn btn-sm btn-secondary shadow-sm">
+        <i class="fas fa-arrow-left fa-sm text-white-50 me-1"></i> Back to Brands
+    </a>
+</div>
+
+<!-- Brand Form Card -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Brand Information</h6>
+    </div>
+    <div class="card-body">
+        <form action="{{ url_for('add_brand') }}" method="post" enctype="multipart/form-data">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="mb-3">
+                        <label for="name" class="form-label required-field">Brand Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="4"></textarea>
+                        <small class="text-muted">Brief description about the brand</small>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="logo" class="form-label">Brand Logo</label>
+                        <input type="file" class="form-control" id="logo" name="logo" accept=".jpg,.jpeg,.png,.gif">
+                        <div id="logoPreviewContainer" class="image-preview-container d-none mt-3">
+                            <img id="logoPreview" class="image-preview" src="#" alt="Logo Preview">
+                        </div>
+                        <small class="text-muted">Optional: Upload brand logo</small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-end mt-4">
+                <button type="reset" class="btn btn-secondary me-2">
+                    <i class="fas fa-redo me-1"></i> Reset
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-1"></i> Add Brand
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Logo preview functionality
+        const logoInput = document.getElementById('logo');
+        const logoPreview = document.getElementById('logoPreview');
+        const logoPreviewContainer = document.getElementById('logoPreviewContainer');
+        
+        logoInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    logoPreview.src = e.target.result;
+                    logoPreviewContainer.classList.remove('d-none');
+                }
+                
+                reader.readAsDataURL(this.files[0]);
+            } else {
+                logoPreviewContainer.classList.add('d-none');
+            }
+        });
+    });
+</script>
+{% endblock %}
