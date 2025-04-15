@@ -361,22 +361,25 @@ def add_product():
                 image_id = save_image_to_mongodb(image)
         
         # Process size variants
-        # Process size variants
         sizes = []
         size_displays = request.form.getlist('size_display[]')
         size_values = request.form.getlist('size[]')
-        size_retail_prices = request.form.getlist('size_retail_price[]')  # New field
+        size_retail_prices = request.form.getlist('size_retail_price[]')  # Retail price field
         size_prices = request.form.getlist('size_price[]')
         size_stocks = request.form.getlist('size_stock[]')
         size_skus = request.form.getlist('size_sku[]')
 
         for i in range(len(size_displays)):
-            if i < len(size_values) and i < len(size_prices) and i < len(size_stocks) and i < len(size_retail_prices):
+            if i < len(size_values) and i < len(size_prices) and i < len(size_stocks):
                 try:
+                    # Get retail price, with fallback to sale price
+                    retail_price = float(size_retail_prices[i]) if i < len(size_retail_prices) else float(size_prices[i])
+                    
                     size = {
+                        'id': str(uuid.uuid4()),  # Generate unique ID for each size
                         'size_display': size_displays[i],
                         'size': int(size_values[i]),
-                        'retail_price': float(size_retail_prices[i]),  # Add retail price
+                        'retail_price': retail_price,  # Add retail price
                         'price': float(size_prices[i]),
                         'stock': int(size_stocks[i]),
                         'sku': size_skus[i] if i < len(size_skus) else f"{request.form.get('name')}-{size_values[i]}ml"
@@ -395,19 +398,39 @@ def add_product():
             default_stock = sizes[0]['stock']
         else:
             # If no sizes provided, create a default size
+            default_retail_price = float(request.form.get('price', 0))
             sizes = [{
+                'id': str(uuid.uuid4()),  # Unique ID
                 'size_display': request.form.get('size_display', '3.3oz/100ml'),
                 'size': int(request.form.get('size', 100)),
+                'retail_price': default_retail_price,  # Add retail price
                 'price': default_price,
                 'stock': default_stock,
                 'sku': request.form.get('sku', f"{request.form.get('name')}-{request.form.get('size', 100)}ml")
             }]
         
+        # Convert category and brand IDs to ObjectId
+        try:
+            category_id = ObjectId(request.form.get('category_id'))
+        except:
+            flash('Invalid category selected', 'danger')
+            categories = list(db.categories.find())
+            brands = list(db.brands.find())
+            return render_template('admin/add_product.html', categories=categories, brands=brands)
+            
+        try:
+            brand_id = ObjectId(request.form.get('brand_id'))
+        except:
+            flash('Invalid brand selected', 'danger')
+            categories = list(db.categories.find())
+            brands = list(db.brands.find())
+            return render_template('admin/add_product.html', categories=categories, brands=brands)
+        
         # Create product with new fields
         new_product = {
             'name': request.form.get('name'),
-            'category_id': ObjectId(request.form.get('category_id')),
-            'brand_id': ObjectId(request.form.get('brand_id')),
+            'category_id': category_id,
+            'brand_id': brand_id,
             'description': request.form.get('description'),
             'price': default_price,  # Default price from first size
             'stock': default_stock,  # Default stock from first size
@@ -428,6 +451,7 @@ def add_product():
     categories = list(db.categories.find())
     brands = list(db.brands.find())
     return render_template('admin/add_product.html', categories=categories, brands=brands)
+
 @app.route('/products/edit/<product_id>', methods=['GET', 'POST'])
 @admin_login_required
 def edit_product(product_id):
@@ -463,10 +487,15 @@ def edit_product(product_id):
             sizes = []
             size_displays = request.form.getlist('size_display[]')
             size_values = request.form.getlist('size[]')
+            size_retail_prices = request.form.getlist('size_retail_price[]')  # Added retail price
             size_prices = request.form.getlist('size_price[]')
             size_stocks = request.form.getlist('size_stock[]')
             size_skus = request.form.getlist('size_sku[]')
             size_ids = request.form.getlist('size_id[]')
+            
+            # Get the list of existing size IDs to identify removed sizes
+            existing_size_ids = [size.get('id') for size in product.get('sizes', []) if 'id' in size]
+            submitted_size_ids = set(size_ids)
             
             # Size value mapping for display names
             size_mapping = {
@@ -482,6 +511,13 @@ def edit_product(product_id):
                     # Get size value from display or mapping
                     display = size_displays[i] if i < len(size_displays) else '3.3oz/100ml'
                     size_value = int(size_values[i]) if i < len(size_values) and size_values[i] else size_mapping.get(display, 100)
+                    
+                    # Get retail price, ensure it's a valid float
+                    retail_price_str = size_retail_prices[i] if i < len(size_retail_prices) else '0'
+                    try:
+                        retail_price = float(retail_price_str)
+                    except ValueError:
+                        retail_price = 0.0
                     
                     # Get price, ensure it's a valid float
                     price_str = size_prices[i] if i < len(size_prices) else '0'
@@ -508,6 +544,7 @@ def edit_product(product_id):
                     size = {
                         'size_display': display,
                         'size': size_value,
+                        'retail_price': retail_price,  # Added retail price
                         'price': price,
                         'stock': stock,
                         'sku': sku
@@ -535,8 +572,8 @@ def edit_product(product_id):
                                     brands=brands)
             
             # Set default price from the first size
-            default_price = sizes[0]['price']
-            default_stock = sizes[0]['stock']
+            default_price = sizes[0]['price'] if sizes else 0
+            default_stock = sizes[0]['stock'] if sizes else 0
             
             # Convert IDs to ObjectIds
             try:
@@ -627,21 +664,26 @@ def edit_product(product_id):
         product['sizes'] = [{
             'size_display': '3.3oz/100ml',
             'size': 100,
+            'retail_price': product.get('price', 0),  # Add default retail price
             'price': product.get('price', 0),
             'stock': product.get('stock', 0),
             'sku': f"{product.get('name')}-100ml",
             'id': str(uuid.uuid4())
         }]
     else:
-        # Make sure each size has an ID
+        # Make sure each size has an ID and retail_price
         for size in product['sizes']:
             if 'id' not in size:
                 size['id'] = str(uuid.uuid4())
+            # Add retail_price if not present
+            if 'retail_price' not in size:
+                size['retail_price'] = size.get('price', 0)
     
     return render_template('admin/edit_product.html', 
                           product=product, 
                           categories=categories,
                           brands=brands)
+
 # Brand Management Routes
 @app.route('/brands')
 @admin_login_required
