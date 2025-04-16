@@ -1,0 +1,142 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Coupons - Admin Panel{% endblock %}
+
+{% block content %}
+<!-- Page Heading -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Guest Coupons</h1>
+    <a href="{{ url_for('add_coupon') }}" class="btn btn-primary">
+        <i class="fas fa-plus-circle me-2"></i> Add New Coupon
+    </a>
+</div>
+
+<!-- Filters Card -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Filter Coupons</h6>
+    </div>
+    <div class="card-body">
+        <form method="get" class="mb-0">
+            <div class="row align-items-end">
+                <div class="col-md-4 mb-3">
+                    <label for="status">Status</label>
+                    <select name="status" id="status" class="form-select">
+                        <option value="">All Statuses</option>
+                        <option value="active" {% if current_status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="upcoming" {% if current_status == 'upcoming' %}selected{% endif %}>Upcoming</option>
+                        <option value="expired" {% if current_status == 'expired' %}selected{% endif %}>Expired</option>
+                        <option value="disabled" {% if current_status == 'disabled' %}selected{% endif %}>Disabled</option>
+                    </select>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label for="q">Search</label>
+                    <input type="text" class="form-control" id="q" name="q" placeholder="Search by code or description" value="{{ search_query }}">
+                </div>
+                <div class="col-md-4 mb-3">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-2"></i> Filter
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Coupons Table -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">All Coupons</h6>
+    </div>
+    <div class="card-body">
+        {% if coupons %}
+        <div class="table-responsive">
+            <table class="table table-bordered" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Description</th>
+                        <th>Discount</th>
+                        <th>Min. Purchase</th>
+                        <th>Validity</th>
+                        <th>Usage</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for coupon in coupons %}
+                    <tr>
+                        <td class="font-weight-bold">{{ coupon.code }}</td>
+                        <td>{{ coupon.description }}</td>
+                        <td>
+                            {% if coupon.discount_type == 'percentage' %}
+                                {{ coupon.discount_value }}%
+                            {% else %}
+                                ${{ coupon.discount_value|round(2) }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if coupon.min_purchase_amount and coupon.min_purchase_amount > 0 %}
+                                ${{ coupon.min_purchase_amount|round(2) }}
+                            {% else %}
+                                None
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if coupon.start_date %}
+                                From: {{ coupon.start_date|format_date }}<br>
+                            {% endif %}
+                            {% if coupon.end_date %}
+                                To: {{ coupon.end_date|format_date }}
+                            {% else %}
+                                No expiration
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ coupon.usage_count }} uses
+                            {% if coupon.usage_limit %}
+                                / {{ coupon.usage_limit }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if coupon.status == 'active' %}
+                                <span class="badge bg-success">Active</span>
+                            {% elif coupon.status == 'upcoming' %}
+                                <span class="badge bg-info">Upcoming</span>
+                            {% elif coupon.status == 'expired' %}
+                                <span class="badge bg-warning">Expired</span>
+                            {% elif coupon.status == 'disabled' %}
+                                <span class="badge bg-danger">Disabled</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group">
+                                <a href="{{ url_for('edit_coupon', coupon_id=coupon._id) }}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <form method="post" action="{{ url_for('toggle_coupon_status', coupon_id=coupon._id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to {{ 'deactivate' if coupon.active else 'activate' }} this coupon?');">
+                                    <button type="submit" class="btn btn-sm {% if coupon.active %}btn-warning{% else %}btn-success{% endif %}">
+                                        <i class="fas fa-{% if coupon.active %}times{% else %}check{% endif %}"></i>
+                                    </button>
+                                </form>
+                                <form method="post" action="{{ url_for('delete_coupon', coupon_id=coupon._id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this coupon? This action cannot be undone.');">
+                                    <button type="submit" class="btn btn-sm btn-danger">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            No coupons found. <a href="{{ url_for('add_coupon') }}">Create your first coupon</a>.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

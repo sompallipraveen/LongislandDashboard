@@ -2682,5 +2682,482 @@ def payment_transactions():
                           max_amount=max_amount,
                           search_query=search_query)
 
+# Coupon Management Routes
+@app.route('/coupons')
+@admin_login_required
+def coupons():
+    """
+    Display all coupons with filtering and sorting
+    """
+    # Get filter parameters
+    status_filter = request.args.get('status')
+    search_query = request.args.get('q')
+    
+    # Build query
+    query = {}
+    
+    # Status filter (active/expired)
+    if status_filter:
+        now = datetime.now()
+        if status_filter == 'active':
+            # Active coupons: start_date ≤ now ≤ end_date or no end_date
+            query['$and'] = [
+                {'start_date': {'$lte': now}},
+                {'$or': [
+                    {'end_date': {'$gte': now}},
+                    {'end_date': {'$exists': False}}
+                ]}
+            ]
+        elif status_filter == 'upcoming':
+            # Upcoming coupons: start_date > now
+            query['start_date'] = {'$gt': now}
+        elif status_filter == 'expired':
+            # Expired coupons: end_date < now
+            query['end_date'] = {'$lt': now}
+        elif status_filter == 'disabled':
+            # Disabled coupons
+            query['active'] = False
+    
+    # Search query
+    if search_query:
+        query['$or'] = [
+            {'code': {'$regex': search_query, '$options': 'i'}},
+            {'description': {'$regex': search_query, '$options': 'i'}}
+        ]
+    
+    try:
+        # Get coupons with sorting
+        coupons_list = list(db.coupons.find(query).sort('created_at', -1))
+        
+        # Add status labels for UI display
+        now = datetime.now()
+        for coupon in coupons_list:
+            if not coupon.get('active', True):
+                coupon['status'] = 'disabled'
+            elif 'start_date' in coupon and coupon['start_date'] > now:
+                coupon['status'] = 'upcoming'
+            elif 'end_date' in coupon and coupon['end_date'] < now:
+                coupon['status'] = 'expired'
+            else:
+                coupon['status'] = 'active'
+                
+            # Add usage count
+            coupon['usage_count'] = db.orders.count_documents({
+                'coupon_code': coupon.get('code'),
+                'status': {'$ne': 'cancelled'}
+            })
+            
+    except Exception as e:
+        flash(f'Error retrieving coupons: {str(e)}', 'danger')
+        coupons_list = []
+    
+    return render_template('admin/coupons.html', 
+                          coupons=coupons_list,
+                          current_status=status_filter,
+                          search_query=search_query)
+
+@app.route('/coupons/add', methods=['GET', 'POST'])
+@admin_login_required
+def add_coupon():
+    """
+    Add a new coupon
+    """
+    if request.method == 'POST':
+        try:
+            # Get form data
+            code = request.form.get('code', '').strip().upper()
+            discount_type = request.form.get('discount_type')
+            
+            # Validate coupon code
+            if not code:
+                flash('Coupon code is required', 'danger')
+                return redirect(url_for('add_coupon'))
+                
+            # Check if coupon code already exists
+            existing_coupon = db.coupons.find_one({'code': code})
+            if existing_coupon:
+                flash(f'Coupon code "{code}" already exists', 'danger')
+                return redirect(url_for('add_coupon'))
+            
+            # Process discount value
+            try:
+                discount_value = float(request.form.get('discount_value', 0))
+                if discount_value <= 0:
+                    flash('Discount value must be greater than zero', 'danger')
+                    return redirect(url_for('add_coupon'))
+                    
+                # For percentage discounts, ensure the value is <= 100
+                if discount_type == 'percentage' and discount_value > 100:
+                    flash('Percentage discount cannot exceed 100%', 'danger')
+                    return redirect(url_for('add_coupon'))
+            except ValueError:
+                flash('Invalid discount value', 'danger')
+                return redirect(url_for('add_coupon'))
+            
+            # Process min_purchase_amount
+            min_purchase_amount = 0
+            if request.form.get('min_purchase_amount'):
+                try:
+                    min_purchase_amount = float(request.form.get('min_purchase_amount'))
+                    if min_purchase_amount < 0:
+                        flash('Minimum purchase amount cannot be negative', 'danger')
+                        return redirect(url_for('add_coupon'))
+                except ValueError:
+                    flash('Invalid minimum purchase amount', 'danger')
+                    return redirect(url_for('add_coupon'))
+            
+            # Process usage_limit
+            usage_limit = None
+            if request.form.get('usage_limit'):
+                try:
+                    usage_limit = int(request.form.get('usage_limit'))
+                    if usage_limit <= 0:
+                        flash('Usage limit must be greater than zero', 'danger')
+                        return redirect(url_for('add_coupon'))
+                except ValueError:
+                    flash('Invalid usage limit', 'danger')
+                    return redirect(url_for('add_coupon'))
+            
+            # Process dates
+            start_date = None
+            end_date = None
+            
+            if request.form.get('start_date'):
+                try:
+                    start_date = datetime.strptime(request.form.get('start_date'), '%Y-%m-%d')
+                except ValueError:
+                    flash('Invalid start date format', 'danger')
+                    return redirect(url_for('add_coupon'))
+            
+            if request.form.get('end_date'):
+                try:
+                    end_date = datetime.strptime(request.form.get('end_date'), '%Y-%m-%d')
+                    # Set time to end of day
+                    end_date = datetime.combine(end_date.date(), datetime.max.time())
+                except ValueError:
+                    flash('Invalid end date format', 'danger')
+                    return redirect(url_for('add_coupon'))
+            
+            # Validate date range
+            if start_date and end_date and start_date > end_date:
+                flash('End date must be after start date', 'danger')
+                return redirect(url_for('add_coupon'))
+            
+            # Create coupon document
+            new_coupon = {
+                'code': code,
+                'description': request.form.get('description', ''),
+                'discount_type': discount_type,
+                'discount_value': discount_value,
+                'min_purchase_amount': min_purchase_amount,
+                'usage_limit': usage_limit,
+                'start_date': start_date,
+                'end_date': end_date,
+                'active': 'active' in request.form,
+                'single_use_per_customer': 'single_use_per_customer' in request.form,
+                'exclude_sale_items': 'exclude_sale_items' in request.form,
+                'created_at': datetime.now(),
+                'created_by': session.get('user_id')
+            }
+            
+            # Add applicable product categories if specified
+            applicable_categories = request.form.getlist('applicable_categories')
+            if applicable_categories:
+                category_ids = []
+                for cat_id in applicable_categories:
+                    try:
+                        category_ids.append(ObjectId(cat_id))
+                    except:
+                        pass
+                if category_ids:
+                    new_coupon['applicable_categories'] = category_ids
+            
+            # Add applicable brands if specified
+            applicable_brands = request.form.getlist('applicable_brands')
+            if applicable_brands:
+                brand_ids = []
+                for brand_id in applicable_brands:
+                    try:
+                        brand_ids.append(ObjectId(brand_id))
+                    except:
+                        pass
+                if brand_ids:
+                    new_coupon['applicable_brands'] = brand_ids
+            
+            # Insert coupon into database
+            result = db.coupons.insert_one(new_coupon)
+            
+            flash('Coupon created successfully', 'success')
+            return redirect(url_for('coupons'))
+            
+        except Exception as e:
+            flash(f'Error creating coupon: {str(e)}', 'danger')
+            return redirect(url_for('add_coupon'))
+    
+    # GET request - show form
+    # Get categories and brands for the form
+    categories = list(db.categories.find())
+    brands = list(db.brands.find())
+    
+    return render_template('admin/add_coupon.html', 
+                          categories=categories,
+                          brands=brands)
+
+@app.route('/coupons/edit/<coupon_id>', methods=['GET', 'POST'])
+@admin_login_required
+def edit_coupon(coupon_id):
+    """
+    Edit an existing coupon
+    """
+    try:
+        coupon = db.coupons.find_one({'_id': ObjectId(coupon_id)})
+    except:
+        flash('Invalid coupon ID', 'danger')
+        return redirect(url_for('coupons'))
+    
+    if not coupon:
+        flash('Coupon not found', 'danger')
+        return redirect(url_for('coupons'))
+    
+    if request.method == 'POST':
+        try:
+            # Get form data
+            code = request.form.get('code', '').strip().upper()
+            discount_type = request.form.get('discount_type')
+            
+            # Validate coupon code
+            if not code:
+                flash('Coupon code is required', 'danger')
+                return redirect(url_for('edit_coupon', coupon_id=coupon_id))
+                
+            # Check if coupon code already exists (for another coupon)
+            existing_coupon = db.coupons.find_one({
+                'code': code,
+                '_id': {'$ne': ObjectId(coupon_id)}
+            })
+            if existing_coupon:
+                flash(f'Another coupon with code "{code}" already exists', 'danger')
+                return redirect(url_for('edit_coupon', coupon_id=coupon_id))
+            
+            # Process discount value
+            try:
+                discount_value = float(request.form.get('discount_value', 0))
+                if discount_value <= 0:
+                    flash('Discount value must be greater than zero', 'danger')
+                    return redirect(url_for('edit_coupon', coupon_id=coupon_id))
+                    
+                # For percentage discounts, ensure the value is <= 100
+                if discount_type == 'percentage' and discount_value > 100:
+                    flash('Percentage discount cannot exceed 100%', 'danger')
+                    return redirect(url_for('edit_coupon', coupon_id=coupon_id))
+            except ValueError:
+                flash('Invalid discount value', 'danger')
+                return redirect(url_for('edit_coupon', coupon_id=coupon_id))
+            
+            # Process min_purchase_amount
+            min_purchase_amount = 0
+            if request.form.get('min_purchase_amount'):
+                try:
+                    min_purchase_amount = float(request.form.get('min_purchase_amount'))
+                    if min_purchase_amount < 0:
+                        flash('Minimum purchase amount cannot be negative', 'danger')
+                        return redirect(url_for('edit_coupon', coupon_id=coupon_id))
+                except ValueError:
+                    flash('Invalid minimum purchase amount', 'danger')
+                    return redirect(url_for('edit_coupon', coupon_id=coupon_id))
+            
+            # Process usage_limit
+            usage_limit = None
+            if request.form.get('usage_limit'):
+                try:
+                    usage_limit = int(request.form.get('usage_limit'))
+                    if usage_limit <= 0:
+                        flash('Usage limit must be greater than zero', 'danger')
+                        return redirect(url_for('edit_coupon', coupon_id=coupon_id))
+                except ValueError:
+                    flash('Invalid usage limit', 'danger')
+                    return redirect(url_for('edit_coupon', coupon_id=coupon_id))
+            
+            # Process dates
+            start_date = None
+            end_date = None
+            
+            if request.form.get('start_date'):
+                try:
+                    start_date = datetime.strptime(request.form.get('start_date'), '%Y-%m-%d')
+                except ValueError:
+                    flash('Invalid start date format', 'danger')
+                    return redirect(url_for('edit_coupon', coupon_id=coupon_id))
+            
+            if request.form.get('end_date'):
+                try:
+                    end_date = datetime.strptime(request.form.get('end_date'), '%Y-%m-%d')
+                    # Set time to end of day
+                    end_date = datetime.combine(end_date.date(), datetime.max.time())
+                except ValueError:
+                    flash('Invalid end date format', 'danger')
+                    return redirect(url_for('edit_coupon', coupon_id=coupon_id))
+            
+            # Validate date range
+            if start_date and end_date and start_date > end_date:
+                flash('End date must be after start date', 'danger')
+                return redirect(url_for('edit_coupon', coupon_id=coupon_id))
+            
+            # Update coupon document
+            update_data = {
+                'code': code,
+                'description': request.form.get('description', ''),
+                'discount_type': discount_type,
+                'discount_value': discount_value,
+                'min_purchase_amount': min_purchase_amount,
+                'usage_limit': usage_limit,
+                'start_date': start_date,
+                'end_date': end_date,
+                'active': 'active' in request.form,
+                'single_use_per_customer': 'single_use_per_customer' in request.form,
+                'exclude_sale_items': 'exclude_sale_items' in request.form,
+                'updated_at': datetime.now(),
+                'updated_by': session.get('user_id')
+            }
+            
+            # Handle applicable categories
+            applicable_categories = request.form.getlist('applicable_categories')
+            if applicable_categories:
+                category_ids = []
+                for cat_id in applicable_categories:
+                    try:
+                        category_ids.append(ObjectId(cat_id))
+                    except:
+                        pass
+                
+                if category_ids:
+                    update_data['applicable_categories'] = category_ids
+                else:
+                    # Remove the field if no categories selected
+                    db.coupons.update_one(
+                        {'_id': ObjectId(coupon_id)},
+                        {'$unset': {'applicable_categories': ''}}
+                    )
+            else:
+                # Remove the field if no categories selected
+                db.coupons.update_one(
+                    {'_id': ObjectId(coupon_id)},
+                    {'$unset': {'applicable_categories': ''}}
+                )
+            
+            # Handle applicable brands
+            applicable_brands = request.form.getlist('applicable_brands')
+            if applicable_brands:
+                brand_ids = []
+                for brand_id in applicable_brands:
+                    try:
+                        brand_ids.append(ObjectId(brand_id))
+                    except:
+                        pass
+                
+                if brand_ids:
+                    update_data['applicable_brands'] = brand_ids
+                else:
+                    # Remove the field if no brands selected
+                    db.coupons.update_one(
+                        {'_id': ObjectId(coupon_id)},
+                        {'$unset': {'applicable_brands': ''}}
+                    )
+            else:
+                # Remove the field if no brands selected
+                db.coupons.update_one(
+                    {'_id': ObjectId(coupon_id)},
+                    {'$unset': {'applicable_brands': ''}}
+                )
+            
+            # Update the database
+            db.coupons.update_one(
+                {'_id': ObjectId(coupon_id)},
+                {'$set': update_data}
+            )
+            
+            flash('Coupon updated successfully', 'success')
+            return redirect(url_for('coupons'))
+            
+        except Exception as e:
+            flash(f'Error updating coupon: {str(e)}', 'danger')
+            return redirect(url_for('edit_coupon', coupon_id=coupon_id))
+    
+    # GET request - show form
+    # Get categories and brands for the form
+    categories = list(db.categories.find())
+    brands = list(db.brands.find())
+    
+    # Format dates for display in form
+    if 'start_date' in coupon and coupon['start_date']:
+        coupon['start_date_formatted'] = coupon['start_date'].strftime('%Y-%m-%d')
+    
+    if 'end_date' in coupon and coupon['end_date']:
+        coupon['end_date_formatted'] = coupon['end_date'].strftime('%Y-%m-%d')
+    
+    # Get currently selected categories and brands
+    selected_categories = []
+    if 'applicable_categories' in coupon:
+        selected_categories = [str(cat_id) for cat_id in coupon['applicable_categories']]
+    
+    selected_brands = []
+    if 'applicable_brands' in coupon:
+        selected_brands = [str(brand_id) for brand_id in coupon['applicable_brands']]
+    
+    return render_template('admin/edit_coupon.html', 
+                          coupon=coupon,
+                          categories=categories,
+                          brands=brands,
+                          selected_categories=selected_categories,
+                          selected_brands=selected_brands)
+
+@app.route('/coupons/delete/<coupon_id>', methods=['POST'])
+@admin_login_required
+def delete_coupon(coupon_id):
+    """
+    Delete a coupon
+    """
+    try:
+        result = db.coupons.delete_one({'_id': ObjectId(coupon_id)})
+        if result.deleted_count > 0:
+            flash('Coupon deleted successfully', 'success')
+        else:
+            flash('Coupon not found', 'danger')
+    except Exception as e:
+        flash(f'Error deleting coupon: {str(e)}', 'danger')
+    
+    return redirect(url_for('coupons'))
+
+@app.route('/coupons/toggle-status/<coupon_id>', methods=['POST'])
+@admin_login_required
+def toggle_coupon_status(coupon_id):
+    """
+    Toggle the active status of a coupon
+    """
+    try:
+        coupon = db.coupons.find_one({'_id': ObjectId(coupon_id)})
+        if not coupon:
+            flash('Coupon not found', 'danger')
+            return redirect(url_for('coupons'))
+        
+        # Toggle the active status
+        new_status = not coupon.get('active', True)
+        
+        db.coupons.update_one(
+            {'_id': ObjectId(coupon_id)},
+            {'$set': {
+                'active': new_status,
+                'updated_at': datetime.now(),
+                'updated_by': session.get('user_id')
+            }}
+        )
+        
+        status_text = 'activated' if new_status else 'deactivated'
+        flash(f'Coupon {status_text} successfully', 'success')
+    except Exception as e:
+        flash(f'Error toggling coupon status: {str(e)}', 'danger')
+    
+    return redirect(url_for('coupons'))
+
 if __name__ == '__main__':
     app.run(debug=True, port=5001)  # Run on a different port than the main app
