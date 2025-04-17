@@ -174,10 +174,6 @@
                             <option value="5.0oz/150ml" {% if size.size_display == '5.0oz/150ml' %}selected{% endif %}>5.0oz/150ml</option>
                         </select>                        
                     </div>
-                    <div class="col-md-1">
-                        <label class="form-label">Size (ml)</label>
-                        <input type="number" name="size[]" class="form-control" value="{{ size.size }}" required>
-                    </div>
                     <div class="col-md-2">
                         <label class="form-label">Retail Price</label>
                         <div class="input-group">
@@ -281,10 +277,6 @@
                 <option value="4.2oz/125ml">4.2oz/125ml</option>
                 <option value="5.0oz/150ml">5.0oz/150ml</option>
             </select>            
-        </div>
-        <div class="col-md-1">
-            <label class="form-label">Size (ml)</label>
-            <input type="number" name="size[]" class="form-control" value="100" required>
         </div>
         <div class="col-md-2">
             <label class="form-label">Retail Price</label>
