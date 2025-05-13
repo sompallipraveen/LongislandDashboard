@@ -20,6 +20,11 @@ from flask import Response
 from datetime import datetime
 import os
 from dotenv import load_dotenv
+from bson import ObjectId
+from flask.json.provider import DefaultJSONProvider
+
+
+
 
 load_dotenv()  # Load environment variables from .env file
 
@@ -155,7 +160,7 @@ def login():
                         raise e
                 
                 if password_matches:
-                    session['user_id'] = str(user['_id'])
+                    session['user_id'] = str(user['_id'])  # ✅ safe
                     session['full_name'] = user['full_name']
                     session['email'] = user['email']
                     session['is_admin'] = True
@@ -934,7 +939,6 @@ def orders():
     if date_to:
         try:
             date_to_obj = datetime.strptime(date_to, '%Y-%m-%d')
-            # Add one day to include the end date fully
             date_to_obj = date_to_obj + timedelta(days=1)
             date_query['$lt'] = date_to_obj
         except ValueError:
@@ -945,7 +949,6 @@ def orders():
     
     # Search query
     if search_query:
-        # Look for the search term in various fields
         query['$or'] = [
             {'shipping_address.full_name': {'$regex': search_query, '$options': 'i'}},
             {'shipping_address.email': {'$regex': search_query, '$options': 'i'}}
@@ -955,12 +958,11 @@ def orders():
         try:
             query['$or'].append({'_id': ObjectId(search_query)})
         except:
-            # If it's not a valid ObjectId, try a regex search on the string representation
-            query['$or'].append({'_id': {'$regex': search_query, '$options': 'i'}})
+            pass
     
     # Determine sort order
     sort_field = 'created_at'
-    sort_direction = -1  # Default to newest first
+    sort_direction = -1
     
     if sort_param == 'date_asc':
         sort_direction = 1
@@ -973,7 +975,43 @@ def orders():
     
     # Execute the query
     try:
-        orders = list(db.orders.find(query).sort(sort_field, sort_direction))
+        # Get orders from database
+        mongodb_orders = list(db.orders.find(query).sort(sort_field, sort_direction))
+        
+        # Process orders to avoid template issues
+        orders = []
+        for order in mongodb_orders:
+            # Convert MongoDB document to a regular dictionary
+            order_dict = {}
+            for key, value in order.items():
+                # Convert ObjectId to string for serialization
+                if isinstance(value, ObjectId):
+                    order_dict[key] = str(value)
+                # Rename 'items' to 'order_items' to prevent method conflict
+                elif key == 'items':
+                    if isinstance(value, list):
+                        # Process each item in the list
+                        items_list = []
+                        for item in value:
+                            if isinstance(item, dict):
+                                # Process each item in the order
+                                item_dict = {}
+                                for k, v in item.items():
+                                    if isinstance(v, ObjectId):
+                                        item_dict[k] = str(v)
+                                    else:
+                                        item_dict[k] = v
+                                items_list.append(item_dict)
+                            else:
+                                items_list.append(item)
+                        order_dict['order_items'] = items_list
+                    else:
+                        # If items is not a list, store it as is
+                        order_dict['order_items'] = value
+                else:
+                    order_dict[key] = value
+            
+            orders.append(order_dict)
     except Exception as e:
         flash(f'Error retrieving orders: {str(e)}', 'danger')
         orders = []
@@ -998,60 +1036,88 @@ def orders():
                           processing_count=status_counts['processing'],
                           shipped_count=status_counts['shipped'],
                           delivered_count=status_counts['delivered'],
-                          cancelled_count=status_counts['cancelled'])
+                          cancelled_count=status_counts['cancelled'],
+                          date_from=date_from,
+                          date_to=date_to,
+                          search_query=search_query)
 
-@app.route('/orders/<order_id>')
+@app.route('/admin/order/<order_id>')
 @admin_login_required
 def order_detail(order_id):
-    """
-    Display detailed information for a specific order
-    """
     try:
         order = db.orders.find_one({'_id': ObjectId(order_id)})
-    except:
-        flash('Invalid order ID format', 'danger')
+        if not order:
+            flash('Order not found', 'danger')
+            return redirect(url_for('orders'))
+        
+        # Convert the order document to ensure all ObjectIds are strings
+        # and rename 'items' to 'order_items'
+        order_dict = {}
+        for key, value in order.items():
+            if isinstance(value, ObjectId):
+                order_dict[key] = str(value)
+            elif key == 'items':
+                # Rename 'items' to 'order_items' to avoid method conflict
+                if isinstance(value, list):
+                    # Process each item in the list
+                    items_list = []
+                    for item in value:
+                        if isinstance(item, dict):
+                            # Process each item in the order
+                            item_dict = {}
+                            for k, v in item.items():
+                                if isinstance(v, ObjectId):
+                                    item_dict[k] = str(v)
+                                else:
+                                    item_dict[k] = v
+                            items_list.append(item_dict)
+                        else:
+                            items_list.append(item)
+                    order_dict['order_items'] = items_list
+                else:
+                    order_dict['order_items'] = value
+            elif isinstance(value, list):
+                # Handle other lists
+                new_list = []
+                for item in value:
+                    if isinstance(item, dict):
+                        new_item = {}
+                        for k, v in item.items():
+                            if isinstance(v, ObjectId):
+                                new_item[k] = str(v)
+                            else:
+                                new_item[k] = v
+                        new_list.append(new_item)
+                    else:
+                        new_list.append(item)
+                order_dict[key] = new_list
+            else:
+                order_dict[key] = value
+        
+        # Get customer details if available
+        customer = None
+        if 'user_id' in order_dict:
+            try:
+                customer = db.users.find_one({'_id': ObjectId(order_dict['user_id'])})
+                if customer:
+                    # Convert customer ObjectId to string
+                    customer_dict = {}
+                    for key, value in customer.items():
+                        if isinstance(value, ObjectId):
+                            customer_dict[key] = str(value)
+                        else:
+                            customer_dict[key] = value
+                    customer = customer_dict
+            except:
+                pass
+        
+        return render_template('admin/order_detail.html', 
+                              order=order_dict, 
+                              customer=customer)
+    
+    except Exception as e:
+        flash(f'An error occurred: {str(e)}', 'danger')
         return redirect(url_for('orders'))
-    
-    if not order:
-        flash('Order not found', 'danger')
-        return redirect(url_for('orders'))
-    
-    # Get customer details if available
-    customer = None
-    customer_orders = []
-    
-    if 'user_id' in order:
-        try:
-            customer = db.users.find_one({'_id': order['user_id']})
-            if customer:
-                # Get customer's orders
-                customer_orders = list(db.orders.find({
-                    'user_id': customer['_id'],
-                    'status': {'$ne': 'cancelled'}
-                }).sort('created_at', -1))
-        except Exception as e:
-            flash(f'Error retrieving customer data: {str(e)}', 'warning')
-    
-    # Calculate customer stats
-    customer_orders_count = len(customer_orders)
-    customer_total_spent = sum(order.get('total', 0) for order in customer_orders)
-    
-    # Get products for items in order
-    for item in order.get('items', []):
-        try:
-            if 'product_id' in item:
-                product = db.products.find_one({'_id': ObjectId(item['product_id'])})
-                if product and 'image_id' in product:
-                    item['product_image_id'] = product['image_id']
-        except:
-            pass
-    
-    return render_template('admin/order_detail.html', 
-                          order=order, 
-                          customer=customer,
-                          customer_orders_count=customer_orders_count,
-                          customer_total_spent=customer_total_spent)
-
 @app.route('/orders/update-status/<order_id>', methods=['POST'])
 @admin_login_required
 def update_order_status(order_id):
@@ -1355,7 +1421,7 @@ def bulk_update_orders():
             
             # Update the order
             db.orders.update_one(
-                {'_id': order['_id']},
+                {'_id': str(order['_id'])},
                 {'$set': {
                     'status': bulk_status,
                     'status_history': status_history,
@@ -1675,7 +1741,9 @@ def delete_image_from_mongodb(image_id):
 # Custom template filters
 @app.template_filter('format_currency')
 def format_currency(value):
-    return f"${value:.2f}"
+    if value is None:
+        return "$0.00"
+    return f"${float(value):.2f}"
 
 @app.template_filter('format_date')
 def format_date(value):
@@ -2341,6 +2409,11 @@ def update_message_counts():
                     {'status': 'unread'},
                     {'_id': 1, 'name': 1, 'message': 1, 'created_at': 1}
                 ).sort('created_at', -1).limit(5))
+                
+                # Convert ObjectId to string
+                for msg in recent_unread:
+                    msg['_id'] = str(msg['_id'])
+                
                 session['recent_unread_messages'] = recent_unread
         except Exception as e:
             print(f"Error updating message counts: {e}")
@@ -3159,5 +3232,133 @@ def toggle_coupon_status(coupon_id):
     
     return redirect(url_for('coupons'))
 
+def convert_objectid(doc):
+    return {k: str(v) if isinstance(v, ObjectId) else v for k, v in doc.items()}
+def sanitize_doc(doc):
+    return {k: str(v) if isinstance(v, ObjectId) else v for k, v in doc.items()}
+
+@app.route('/advanced-orders')
+@admin_login_required
+def advanced_orders():
+    """
+    Display advanced orders view with more detailed information
+    """
+    # Get filter parameters (similar to regular orders)
+    status_filter = request.args.get('status')
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
+    search_query = request.args.get('q')
+    sort_param = request.args.get('sort', 'date_desc')
+    
+    # Build query (similar to regular orders)
+    query = {}
+    
+    # Status filter
+    if status_filter:
+        query['status'] = status_filter
+    
+    # Date range filter
+    date_query = {}
+    if date_from:
+        try:
+            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
+            date_query['$gte'] = date_from_obj
+        except ValueError:
+            flash('Invalid date format for From date', 'warning')
+    
+    if date_to:
+        try:
+            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d')
+            date_to_obj = date_to_obj + timedelta(days=1)
+            date_query['$lt'] = date_to_obj
+        except ValueError:
+            flash('Invalid date format for To date', 'warning')
+    
+    if date_query:
+        query['created_at'] = date_query
+    
+    # Search query
+    if search_query:
+        query['$or'] = [
+            {'shipping_address.full_name': {'$regex': search_query, '$options': 'i'}},
+            {'shipping_address.email': {'$regex': search_query, '$options': 'i'}}
+        ]
+        
+        try:
+            query['$or'].append({'_id': ObjectId(search_query)})
+        except:
+            query['$or'].append({'_id': {'$regex': search_query, '$options': 'i'}})
+    
+    # Determine sort order
+    sort_field = 'created_at'
+    sort_direction = -1
+    
+    if sort_param == 'date_asc':
+        sort_direction = 1
+    elif sort_param == 'total_desc':
+        sort_field = 'total'
+        sort_direction = -1
+    elif sort_param == 'total_asc':
+        sort_field = 'total'
+        sort_direction = 1
+    
+    # Execute the query
+    try:
+        orders = list(db.orders.find(query).sort(sort_field, sort_direction))
+    except Exception as e:
+        flash(f'Error retrieving orders: {str(e)}', 'danger')
+        orders = []
+    
+    # Calculate total amount for displayed orders
+    total_amount = sum(order.get('total', 0) for order in orders)
+    
+    # Get counts for each status
+    status_counts = {
+        'pending': db.orders.count_documents({'status': 'pending'}),
+        'processing': db.orders.count_documents({'status': 'processing'}),
+        'shipped': db.orders.count_documents({'status': 'shipped'}),
+        'delivered': db.orders.count_documents({'status': 'delivered'}),
+        'cancelled': db.orders.count_documents({'status': 'cancelled'})
+    }
+    
+    return render_template('admin/advanced_orders.html', 
+                          orders=orders, 
+                          current_status=status_filter,
+                          total_amount=total_amount,
+                          status_counts=status_counts)
+
+class MongoJSONProvider(DefaultJSONProvider):
+    def default(self, o):
+        if isinstance(o, ObjectId):
+            return str(o)
+        if isinstance(o, datetime):
+            return o.isoformat()
+        return super().default(o)
+
+# Set the custom JSON provider on the Flask app
+app.json_provider_class = MongoJSONProvider
+app.json = MongoJSONProvider(app)
+
+def sanitize_mongo_doc(doc):
+    """Convert MongoDB document to a safe dictionary for templates"""
+    if isinstance(doc, dict):
+        # Create a new dict without the items() method conflict
+        result = {}
+        for k, v in doc.items():
+            # Rename 'items' key to 'order_items' to avoid method conflict
+            if k == 'items':
+                result['order_items'] = sanitize_mongo_doc(v)
+            elif isinstance(v, (dict, list)):
+                result[k] = sanitize_mongo_doc(v)
+            elif isinstance(v, ObjectId):
+                result[k] = str(v)
+            else:
+                result[k] = v
+        return result
+    elif isinstance(doc, list):
+        return [sanitize_mongo_doc(item) for item in doc]
+    else:
+        return doc
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)  # Run on a different port than the main app
+    app.run(debug=True, port=5001, use_reloader=False)
