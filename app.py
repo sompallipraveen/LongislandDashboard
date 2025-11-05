@@ -508,7 +508,7 @@ def edit_product(product_id):
                 '1.7oz/50ml': 50,
                 '2.5oz/75ml': 75,
                 '3.3oz/100ml': 100,
-                '6.7oz/200ml': 200
+                '6.7oz/200ml': 200    
             }
             
             for i in range(len(size_displays)):
@@ -2154,6 +2154,7 @@ def bulk_update_products():
     flash(f'Successfully updated prices for {updated_count} products', 'success')
     return redirect(url_for('products'))
 
+
 # Contact Message Management Routes
 @app.route('/contact-messages')
 @admin_login_required
@@ -2186,7 +2187,6 @@ def contact_messages():
     if date_to:
         try:
             date_to_obj = datetime.strptime(date_to, '%Y-%m-%d')
-            # Add one day to include the end date fully
             date_to_obj = date_to_obj + timedelta(days=1)
             date_query['$lt'] = date_to_obj
         except ValueError:
@@ -2197,7 +2197,6 @@ def contact_messages():
     
     # Search query
     if search_query:
-        # Look for the search term in various fields
         query['$or'] = [
             {'name': {'$regex': search_query, '$options': 'i'}},
             {'email': {'$regex': search_query, '$options': 'i'}},
@@ -2205,9 +2204,11 @@ def contact_messages():
             {'message': {'$regex': search_query, '$options': 'i'}}
         ]
     
-    # Get messages with sorting (newest first)
+    # Get messages WITHOUT sorting to avoid memory error
     try:
-        messages = list(db.contact_messages.find(query).sort('created_at', -1))
+        messages = list(db.contact_messages.find(query).limit(500))
+        # Sort in Python instead of MongoDB (less efficient but works)
+        messages.sort(key=lambda x: x.get('created_at', datetime.min), reverse=True)
     except Exception as e:
         flash(f'Error retrieving messages: {str(e)}', 'danger')
         messages = []
@@ -2218,6 +2219,8 @@ def contact_messages():
                           search_query=search_query,
                           date_from=date_from,
                           date_to=date_to)
+
+
 
 @app.route('/contact-messages/<message_id>')
 @admin_login_required
@@ -3359,6 +3362,12 @@ def sanitize_mongo_doc(doc):
         return [sanitize_mongo_doc(item) for item in doc]
     else:
         return doc
+
+try:
+    db.contact_messages.create_index([("created_at", -1)])
+    print("Contact messages index created")
+except Exception as e:
+    print(f"Index creation error: {e}")
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001, use_reloader=False)

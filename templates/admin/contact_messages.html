@@ -44,6 +44,27 @@
     .highlight-unread {
         font-weight: bold;
     }
+    
+    .pagination-info {
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+    
+    .page-link {
+        color: #4e73df;
+        border-color: #4e73df;
+    }
+    
+    .page-link:hover {
+        color: #224abe;
+        background-color: #f8f9fc;
+        border-color: #224abe;
+    }
+    
+    .page-item.active .page-link {
+        background-color: #4e73df;
+        border-color: #4e73df;
+    }
 </style>
 {% endblock %}
 
@@ -151,7 +172,7 @@
                                 <span class="preview-text {% if message.status == 'unread' %}highlight-unread{% endif %}">{{ message.message }}</span>
                             </td>
                             <td>
-                                {{ message.created_at|format_datetime }}
+                                {{ message.created_at.strftime('%B %d, %Y, %I:%M %p') if message.created_at else 'N/A' }}
                             </td>
                             <td>
                                 <span class="badge status-badge status-{{ message.status }}">
@@ -182,7 +203,7 @@
                                             </div>
                                             <div class="modal-footer">
                                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                <form action="{{ url_for('delete_contact_message', message_id=message._id) }}" method="post">
+                                                <form action="{{ url_for('delete_contact_message', message_id=message._id) }}" method="post" style="display: inline;">
                                                     <button type="submit" class="btn btn-danger">Delete</button>
                                                 </form>
                                             </div>
@@ -205,6 +226,107 @@
         {% endif %}
     </div>
 </div>
+
+<!-- Pagination will be added after you update the Python function -->
+{% if false %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="pagination-info">
+        Showing {{ ((page - 1) * per_page) + 1 }} to {{ 
+            ((page - 1) * per_page) + messages|length 
+        }} of {{ total_messages }} messages
+    </div>
+    
+    <nav aria-label="Messages pagination">
+        <ul class="pagination mb-0">
+            {% if has_prev %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('contact_messages', 
+                    page=page-1, 
+                    status=current_status, 
+                    q=search_query, 
+                    date_from=date_from, 
+                    date_to=date_to) }}">
+                    <i class="fas fa-chevron-left"></i> Previous
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+                <span class="page-link"><i class="fas fa-chevron-left"></i> Previous</span>
+            </li>
+            {% endif %}
+            
+            {% set start_page = [1, page - 2]|max %}
+            {% set end_page = [total_pages, page + 2]|min %}
+            
+            {% if start_page > 1 %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('contact_messages', 
+                    page=1, 
+                    status=current_status, 
+                    q=search_query, 
+                    date_from=date_from, 
+                    date_to=date_to) }}">1</a>
+            </li>
+            {% if start_page > 2 %}
+            <li class="page-item disabled">
+                <span class="page-link">...</span>
+            </li>
+            {% endif %}
+            {% endif %}
+            
+            {% for p in range(start_page, end_page + 1) %}
+                {% if p == page %}
+                <li class="page-item active">
+                    <span class="page-link">{{ p }}</span>
+                </li>
+                {% else %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('contact_messages', 
+                        page=p, 
+                        status=current_status, 
+                        q=search_query, 
+                        date_from=date_from, 
+                        date_to=date_to) }}">{{ p }}</a>
+                </li>
+                {% endif %}
+            {% endfor %}
+            
+            {% if end_page < total_pages %}
+            {% if end_page < total_pages - 1 %}
+            <li class="page-item disabled">
+                <span class="page-link">...</span>
+            </li>
+            {% endif %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('contact_messages', 
+                    page=total_pages, 
+                    status=current_status, 
+                    q=search_query, 
+                    date_from=date_from, 
+                    date_to=date_to) }}">{{ total_pages }}</a>
+            </li>
+            {% endif %}
+            
+            {% if has_next %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('contact_messages', 
+                    page=page+1, 
+                    status=current_status, 
+                    q=search_query, 
+                    date_from=date_from, 
+                    date_to=date_to) }}">
+                    Next <i class="fas fa-chevron-right"></i>
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">Next <i class="fas fa-chevron-right"></i></span>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+</div>
+{% endif %}
 
 <!-- Bulk Action Modal -->
 <div class="modal fade" id="bulkActionModal" tabindex="-1" aria-labelledby="bulkActionModalLabel" aria-hidden="true">
@@ -296,7 +418,39 @@ document.addEventListener('DOMContentLoaded', function() {
             if (selectedMessages.length === 0) {
                 e.preventDefault();
                 alert('Please select at least one message to perform this action.');
+                return false;
             }
+        }
+    });
+
+    // Handle individual message checkbox changes
+    const messageCheckboxes = document.querySelectorAll('.message-check');
+    messageCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            // Update select all checkbox state
+            const allChecked = Array.from(messageCheckboxes).every(cb => cb.checked);
+            const anyChecked = Array.from(messageCheckboxes).some(cb => cb.checked);
+            
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = allChecked;
+                selectAllCheckbox.indeterminate = anyChecked && !allChecked;
+            }
+        });
+    });
+
+    // Auto-submit forms for delete modals
+    const deleteModals = document.querySelectorAll('[id^="deleteModal"]');
+    deleteModals.forEach(modal => {
+        const deleteForm = modal.querySelector('form');
+        if (deleteForm) {
+            deleteForm.addEventListener('submit', function() {
+                // Add loading state to delete button
+                const deleteBtn = this.querySelector('button[type="submit"]');
+                if (deleteBtn) {
+                    deleteBtn.disabled = true;
+                    deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+                }
+            });
         }
     });
 });
